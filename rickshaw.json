@@ -1,0 +1,37 @@
+{
+    "rickshaw-tool": {
+        "schema": {
+            "version": "2020.03.18"
+        }
+    },
+    "tool": "kerneltools",
+    "controller": {
+        "post-script": "%tool-dir%kerneltools-post-process"
+    },
+    "collector": {
+        "files-from-controller": [
+            {
+                "src": "%tool-dir%/kerneltools-start",
+                "dest": "/usr/bin/"
+            },
+            {
+                "src": "%tool-dir%/kerneltools-stop",
+                "dest": "/usr/bin/"
+            }
+        ],
+        "blacklist": [
+            {
+                "endpoint": "k8s",
+                "collector-types": [ "client", "server" ]
+            }
+        ],
+        "whitelist": [
+            {
+                "endpoint": "k8s",
+                "collector-types": [ "master", "worker" ]
+            }
+        ],
+        "start": "kerneltools-start",
+        "stop": "kerneltools-stop"
+      }
+}

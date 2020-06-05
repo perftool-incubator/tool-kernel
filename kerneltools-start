@@ -1,0 +1,59 @@
+#!/bin/bash
+exec >kerneltools-start-stderrout.txt
+exec 2>&1
+
+echo "args: $@"
+echo
+echo "pwd: `/bin/pwd`"
+echo
+echo "hostname: `hostname`"
+echo
+# defaults
+subtools="perf"
+
+longopts="subtools,perf-record-opts:"
+opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
+if [ $? -ne 0 ]; then
+    printf -- "\tUnrecognized option specified\n\n"
+    exit 1
+fi
+eval set -- "$opts";
+while true; do
+    case "$1" in
+        --subtools)
+            shift;
+            subtools=$1
+            echo "subtools=$subtools"
+            shift;
+            ;;
+        --perf-record-opts)
+            shift;
+            perf_record_opts=$1
+            echo "perf_record_opts=$perf_record_opts"
+            shift;
+            ;;
+        --)
+            shift;
+            break
+            ;;
+        *)
+            echo "Invalid option: $1"
+            exit 1
+    esac
+done
+
+/bin/rm -f kerneltools-pids.txt
+for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
+    case "$subtool" in
+        perf)
+            echo "Starting perf record"
+            TZ=UTC S_TIME_FORMAT=ISO /usr/bin/perf record -a $perf_record_opts &
+            perf_pid=$!
+            echo "perf pid is $perf_pid"
+            echo "$perf_pid" >>kerneltools-pids.txt
+            ;;
+        *)
+            echo "Invalid subtool: $subtool"
+            ;;
+    esac
+done

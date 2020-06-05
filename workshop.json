@@ -1,0 +1,63 @@
+{
+    "workshop": {
+        "schema": {
+            "version": "2020.03.02"
+        }
+    },
+    "userenvs": [
+        {
+            "name": "default",
+            "requirements": [
+                "bzip2",
+                "bison",
+                "flex",
+                "perf"
+            ]
+        }
+    ],
+    "requirements": [
+        {
+            "name": "bzip2",
+            "type": "distro",
+            "distro_info": {
+                "packages": [
+                    "bzip2"
+                ]
+            }
+        },
+        {
+            "name": "bison",
+            "type": "distro",
+            "distro_info": {
+                "packages": [
+                    "bison"
+                ]
+            }
+        },
+        {
+            "name": "flex",
+            "type": "distro",
+            "distro_info": {
+                "packages": [
+                    "flex"
+                ]
+            }
+        },
+        {
+            "name": "perf",
+            "type": "source",
+            "source_info": {
+                "url": "https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.7.tar.xz",
+                "filename": "linux-5.7.tar.xz",
+                "commands": { 
+                    "unpack": "tar -Jxf linux-5.7.tar.xz",
+                    "get_dir": "tar -Jtf linux-5.7.tar.xz | head -n 1",
+                    "commands": [
+                        "make -C tools/ perf_install prefix=/usr/",
+                        "rm -rf *"
+                    ]
+                }
+            }
+        }
+    ]
+}

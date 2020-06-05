@@ -1,0 +1,76 @@
+#!/bin/bash
+exec >kerneltools-stop-stderrout.txt
+exec 2>&1
+
+echo "args: $@"
+echo
+echo "pwd: `/bin/pwd`"
+echo
+echo "hostname: `hostname`"
+echo
+
+# defaults
+subtools="perf"
+
+longopts="subtools,perf-record-opts:"
+opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
+if [ $? -ne 0 ]; then
+    printf -- "\tUnrecognized option specified\n\n"
+    exit 1
+fi
+eval set -- "$opts";
+while true; do
+    case "$1" in
+        --subtools)
+            shift;
+            subtools=$1
+            echo "subtools=$subtools"
+            shift;
+            ;;
+        --perf-record-opts)
+            shift;
+            record_opts=$1
+            echo "perf_record_opts=$perf_record_opts"
+            shift;
+            ;;
+        --)
+            shift;
+            break
+            ;;
+        *)
+            echo "Invalid option: $1"
+            exit 1
+    esac
+done
+
+date
+if [ -e kerneltools-pids.txt ]; then
+    while read pid; do
+        echo "Going to kill pid $pid"
+        kill -s SIGINT $pid
+        sleep 5
+        count=1
+        while [ $count -lt 20 -a -e /proc/$pid ]; do
+            echo "pgrep $perf:"
+            pgrep perf
+            let count=$count+1
+            sleep 3
+        done
+    done <kerneltools-pids.txt
+else
+    echo "Could not find kerneltools-pids.txt"
+    exit 1
+fi
+date
+
+for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
+    case "$subtool" in
+        perf)
+            echo "Running perf archive"
+            time /usr/bin/perf archive perf.data
+            ;;
+        *)
+            echo "Invalid subtool: $subtool"
+            ;;
+    esac
+done
