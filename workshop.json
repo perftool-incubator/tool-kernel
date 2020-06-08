@@ -8,39 +8,72 @@
         {
             "name": "default",
             "requirements": [
-                "bzip2",
-                "bison",
-                "flex",
-                "perf"
+                "diffutils",
+                "bzip2_src",
+                "bison_src",
+                "flex_src",
+                "perf_src"
             ]
         }
     ],
     "requirements": [
         {
-            "name": "bzip2",
+            "name": "diffutils",
             "type": "distro",
             "distro_info": {
                 "packages": [
-                    "bzip2"
+                    "diffutils"
                 ]
             }
         },
         {
-            "name": "bison",
-            "type": "distro",
-            "distro_info": {
-                "packages": [
-                    "bison"
-                ]
+            "name": "bzip2_src",
+            "type": "source",
+            "source_info": {
+                "url": "https://downloads.sourceforge.net/project/bzip2/bzip2-1.0.6.tar.gz",
+                "filename": "bzip2-1.0.6.tar.gz",
+                "commands": {
+                    "unpack": "tar -zxf bzip2-1.0.6.tar.gz",
+                    "get_dir": "tar -ztf bzip2-1.0.6.tar.gz | head -n 1 | awk -F/ '{print $1}'",
+                    "commands": [
+                        "make",
+                        "make install"
+                    ]
+                }
             }
         },
         {
-            "name": "flex",
-            "type": "distro",
-            "distro_info": {
-                "packages": [
-                    "flex"
-                ]
+            "name": "flex_src",
+            "type": "source",
+            "source_info": {
+                "url": "https://github.com/westes/flex/files/981163/flex-2.6.4.tar.gz",
+                "filename": "flex-2.6.4.tar.gz",
+                "commands": {
+                    "unpack": "tar -zxf flex-2.6.4.tar.gz",
+                    "get_dir": "tar -ztf flex-2.6.4.tar.gz | head -n 1",
+                    "commands": [
+                        "./configure",
+                        "make",
+                        "make install"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "bison_src",
+            "type": "source",
+            "source_info": {
+                "url": "http://ftp.gnu.org/gnu/bison/bison-3.6.tar.gz",
+                "filename": "bison-3.6.tar.gz",
+                "commands": {
+                    "unpack": "tar -zxf bison-3.6.tar.gz",
+                    "get_dir": "tar -ztf bison-3.6.tar.gz | head -n 1",
+                    "commands": [
+                        "./configure",
+                        "make",
+                        "make install"
+                    ]
+                }
             }
         },
         {
@@ -49,7 +82,7 @@
             "source_info": {
                 "url": "https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.7.tar.xz",
                 "filename": "linux-5.7.tar.xz",
-                "commands": { 
+                "commands": {
                     "unpack": "tar -Jxf linux-5.7.tar.xz",
                     "get_dir": "tar -Jtf linux-5.7.tar.xz | head -n 1",
                     "commands": [
