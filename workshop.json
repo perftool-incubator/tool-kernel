@@ -10,6 +10,7 @@
             "requirements": [
                 "diffutils",
                 "bzip2_src",
+                "xz_src",
                 "bison_src",
                 "flex_src",
                 "perf_src"
@@ -36,6 +37,23 @@
                     "unpack": "tar -zxf bzip2-1.0.6.tar.gz",
                     "get_dir": "tar -ztf bzip2-1.0.6.tar.gz | head -n 1 | awk -F/ '{print $1}'",
                     "commands": [
+                        "make",
+                        "make install"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "xz_src",
+            "type": "source",
+            "source_info": {
+                "url": "https://tukaani.org/xz/xz-5.2.5.tar.gz",
+                "filename": "xz-5.2.5.tar.gz",
+                "commands": {
+                    "unpack": "tar -zxf xz-5.2.5.tar.gz",
+                    "get_dir": "tar -ztf xz-5.2.5.tar.gz | head -n 1",
+                    "commands": [
+                        "./configure",
                         "make",
                         "make install"
                     ]
@@ -77,14 +95,14 @@
             }
         },
         {
-            "name": "perf",
+            "name": "perf_src",
             "type": "source",
             "source_info": {
-                "url": "https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.7.tar.xz",
-                "filename": "linux-5.7.tar.xz",
+                "url": "https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.7.tar.gz",
+                "filename": "linux-5.7.tar.gz",
                 "commands": {
-                    "unpack": "tar -Jxf linux-5.7.tar.xz",
-                    "get_dir": "tar -Jtf linux-5.7.tar.xz | head -n 1",
+                    "unpack": "tar -zxf linux-5.7.tar.gz",
+                    "get_dir": "tar -ztf linux-5.7.tar.gz | head -n 1",
                     "commands": [
                         "make -C tools/ perf_install prefix=/usr/",
                         "rm -rf *"
