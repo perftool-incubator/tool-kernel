@@ -11,8 +11,9 @@ echo
 
 # defaults
 subtools="perf"
+perf_gen_local_report=0
 
-longopts="subtools,perf-record-opts:"
+longopts="subtools,perf-record-opts:,perf-gen-local-report"
 opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
 if [ $? -ne 0 ]; then
     printf -- "\tUnrecognized option specified\n\n"
@@ -32,6 +33,10 @@ while true; do
             record_opts=$1
             echo "perf_record_opts=$perf_record_opts"
             shift;
+            ;;
+        --perf-gen-local-report)
+            shift;
+            perf_gen_local_report=1
             ;;
         --)
             shift;
@@ -68,6 +73,10 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
         perf)
             echo "Running perf archive"
             time /usr/bin/perf archive perf.data
+            if [ "$perf_gen_local_report" == "1" ]; then
+                perf report 2>&1 >perf-report.txt
+            fi
+            xz --threads=0 perf.data
             ;;
         *)
             echo "Invalid subtool: $subtool"

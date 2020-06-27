@@ -8,6 +8,9 @@ echo "pwd: `/bin/pwd`"
 echo
 echo "hostname: `hostname`"
 echo
+echo "mount:"
+mount
+echo
 # defaults
 subtools="perf"
 
@@ -47,7 +50,9 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
     case "$subtool" in
         perf)
             echo "Starting perf record"
-            TZ=UTC S_TIME_FORMAT=ISO /usr/bin/perf record -a $perf_record_opts &
+            mkdir -p ~/.debug
+            echo going to run "/usr/bin/perf record -a $perf_record_opts"
+            /usr/bin/perf record -a $perf_record_opts &
             perf_pid=$!
             echo "perf pid is $perf_pid"
             echo "$perf_pid" >>kerneltools-pids.txt
