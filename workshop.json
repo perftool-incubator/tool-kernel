@@ -8,54 +8,41 @@
         {
             "name": "default",
             "requirements": [
-                "diffutils",
-                "bzip2_src",
-                "xz_src",
-                "bison_src",
-                "flex_src",
-                "perf_src"
+                "bison_src", "gettext_src", "flex_src", "perf_src"
             ]
         }
     ],
     "requirements": [
         {
-            "name": "diffutils",
-            "type": "distro",
-            "distro_info": {
-                "packages": [
-                    "diffutils"
-                ]
-            }
-        },
-        {
-            "name": "bzip2_src",
+            "name": "bison_src",
             "type": "source",
             "source_info": {
-                "url": "https://downloads.sourceforge.net/project/bzip2/bzip2-1.0.6.tar.gz",
-                "filename": "bzip2-1.0.6.tar.gz",
+                "url": "http://ftp.gnu.org/gnu/bison/bison-3.7.tar.xz",
+                "filename": "bison-3.7.tar.xz",
                 "commands": {
-                    "unpack": "tar -zxf bzip2-1.0.6.tar.gz",
-                    "get_dir": "tar -ztf bzip2-1.0.6.tar.gz | head -n 1 | awk -F/ '{print $1}'",
+                    "unpack": "tar -Jxf bison-3.7.tar.xz",
+                    "get_dir": "tar -Jtf bison-3.7.tar.xz | head -n 1",
                     "commands": [
-                        "make",
-                        "make install"
+                        "./configure",
+                        "make install",
+                        "ldconfig"
                     ]
                 }
             }
         },
         {
-            "name": "xz_src",
+            "name": "gettext_src",
             "type": "source",
             "source_info": {
-                "url": "https://tukaani.org/xz/xz-5.2.5.tar.gz",
-                "filename": "xz-5.2.5.tar.gz",
+                "url": "https://ftp.gnu.org/pub/gnu/gettext/gettext-0.21.tar.gz",
+                "filename": "gettext-0.21.tar.gz",
                 "commands": {
-                    "unpack": "tar -zxf xz-5.2.5.tar.gz",
-                    "get_dir": "tar -ztf xz-5.2.5.tar.gz | head -n 1",
+                    "unpack": "tar -zxf gettext-0.21.tar.gz",
+                    "get_dir": "tar -ztf gettext-0.21.tar.gz | head -n 1",
                     "commands": [
                         "./configure",
-                        "make",
-                        "make install"
+                        "make install",
+                        "ldconfig"
                     ]
                 }
             }
@@ -70,26 +57,10 @@
                     "unpack": "tar -zxf flex-2.6.4.tar.gz",
                     "get_dir": "tar -ztf flex-2.6.4.tar.gz | head -n 1",
                     "commands": [
-                        "./configure",
-                        "make",
-                        "make install"
-                    ]
-                }
-            }
-        },
-        {
-            "name": "bison_src",
-            "type": "source",
-            "source_info": {
-                "url": "http://ftp.gnu.org/gnu/bison/bison-3.6.tar.gz",
-                "filename": "bison-3.6.tar.gz",
-                "commands": {
-                    "unpack": "tar -zxf bison-3.6.tar.gz",
-                    "get_dir": "tar -ztf bison-3.6.tar.gz | head -n 1",
-                    "commands": [
-                        "./configure",
-                        "make",
-                        "make install"
+                        "./autogen.sh",
+                        "./configure CFLAGS=' -D_GNU_SOURCE'",
+                        "make install",
+                        "ldconfig"
                     ]
                 }
             }
@@ -98,13 +69,14 @@
             "name": "perf_src",
             "type": "source",
             "source_info": {
-                "url": "https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.7.tar.gz",
-                "filename": "linux-5.7.tar.gz",
+                "url": "https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.10.5.tar.xz",
+                "filename": "linux-5.7.tar.xz",
                 "commands": {
-                    "unpack": "tar -zxf linux-5.7.tar.gz",
-                    "get_dir": "tar -ztf linux-5.7.tar.gz | head -n 1",
+                    "unpack": "tar -Jxf linux-5.7.tar.xz",
+                    "get_dir": "tar -Jtf linux-5.7.tar.xz | head -n 1",
                     "commands": [
                         "make -C tools/ perf_install prefix=/usr/",
+                        "ldconfig",
                         "rm -rf *"
                     ]
                 }
