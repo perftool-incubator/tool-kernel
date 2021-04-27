@@ -8,11 +8,27 @@
         {
             "name": "default",
             "requirements": [
-                "bison_src", "gettext_src", "flex_src", "perf_src"
+                "bzip2_src", "bison_src", "gettext_src", "flex_src", "perf_src"
             ]
         }
     ],
     "requirements": [
+        {
+            "name": "bzip2_src",
+            "type": "source",
+            "source_info": {
+                "url": "https://www.sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz",
+                "filename": "bzip2-1.0.8.tar.gz",
+                "commands": {
+                    "unpack": "tar -zxf bzip2-1.0.8.tar.gz",
+                    "get_dir": "tar -ztf bzip2-1.0.8.tar.gz | head -n 1 | awk -F/ '{print $1}'",
+                    "commands": [
+                        "make install",
+                        "ldconfig"
+                    ]
+                }
+            }
+        },
         {
             "name": "bison_src",
             "type": "source",
