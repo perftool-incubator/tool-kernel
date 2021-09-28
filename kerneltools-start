@@ -12,7 +12,7 @@ echo "mount:"
 mount
 echo
 # defaults
-subtools="perf"
+subtools="perf,turbostat"
 
 longopts="subtools,perf-record-opts:"
 opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
@@ -56,6 +56,14 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
             perf_pid=$!
             echo "perf pid is $perf_pid"
             echo "$perf_pid" >>kerneltools-pids.txt
+            ;;
+        turbostat)
+            echo "Starting turbostat"
+            #/usr/bin/turbostat -d -e all -o turbostat-stdout.txt -i 3 </dev/null &
+            su -c /usr/bin/turbostat-start root &
+            turbo_pid=$!
+            echo "turbostat pid is $turbo_pid"
+            echo "$turbo_pid" >>kerneltools-pids.txt
             ;;
         *)
             echo "Invalid subtool: $subtool"

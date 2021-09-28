@@ -11,6 +11,10 @@
     "collector": {
         "files-from-controller": [
             {
+                "src": "%tool-dir%/turbostat-start",
+                "dest": "/usr/bin/"
+            },
+            {
                 "src": "%tool-dir%/kerneltools-start",
                 "dest": "/usr/bin/"
             },

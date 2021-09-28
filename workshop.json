@@ -8,7 +8,7 @@
         {
             "name": "default",
             "requirements": [
-                "bzip2_src", "bison_src", "gettext_src", "flex_src", "perf_src"
+                "bzip2_src", "bison_src", "gettext_src", "flex_src", "libcap_src", "tools_src"
             ]
         }
     ],
@@ -82,7 +82,7 @@
             }
         },
         {
-            "name": "perf_src",
+            "name": "tools_src",
             "type": "source",
             "source_info": {
                 "url": "https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.10.5.tar.xz",
@@ -92,6 +92,7 @@
                     "get_dir": "tar -Jtf linux-5.7.tar.xz | head -n 1",
                     "commands": [
                         "make -C tools/ perf_install prefix=/usr/",
+                        "make -C tools/ turbostat_install prefix=/usr/",
                         "ldconfig",
                         "rm -rf *"
                     ]

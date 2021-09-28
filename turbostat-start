@@ -1,0 +1,5 @@
+#!/bin/bash
+
+echo starting turbostat at `date`
+exec /usr/bin/turbostat -i 3 >turbostat-stdout.txt 2>turbostat-stderr.txt
+echo ending turbostat at `date`
