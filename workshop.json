@@ -8,7 +8,7 @@
         {
             "name": "default",
             "requirements": [
-                "bzip2_src", "bison_src", "gettext_src", "flex_src", "libcap_src", "tools_src"
+                "bzip2_src", "bison_src", "gettext_src", "flex_src", "tools_src"
             ]
         }
     ],
