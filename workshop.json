@@ -93,6 +93,7 @@
                     "commands": [
                         "make -C tools/ perf_install prefix=/usr/",
                         "make -C tools/ turbostat_install prefix=/usr/",
+                        "make -C tools/ intel-speed-select_install prefix=/usr/",
                         "ldconfig",
                         "rm -rf *"
                     ]
