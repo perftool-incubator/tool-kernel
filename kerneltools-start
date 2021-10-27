@@ -51,12 +51,17 @@ while true; do
             shift;
             echo "setting turbo_freq=$turbo_freq"
             ;;
+        --interval)
+            interval=$1
+            shift;
+            echo "setting turbo_freq=$turbo_freq"
+            ;;
         --)
             shift;
             break
             ;;
         *)
-            echo "Invalid option: $1"
+            echo "Invalid option: $arg"
             exit 1
     esac
 done
@@ -82,6 +87,8 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
             ;;
         intel-speed-select)
             echo "invoking intel-speed-select"
+            # get the settings before we change anything
+            /usr/bin/intel-speed-select perf-profile info -l 0 |& grep speed-select|grep ":"|sort|uniq >settings.txt
             if [ ! -z "$base_freq" ]; then
                 if [ "$base_freq" == "enable" ]; then
                     echo "running: /usr/bin/intel-speed-select base-freq enable -a"
@@ -115,6 +122,9 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
                     echo "The value for argument --turbo-freq [$turbo_freq] is not supported"
                 fi
             fi
+            for i in info get-lock-status get-config-levels get-config-version get-config-enabled get-config-current-level; do
+                /usr/bin/intel-speed-select perf-profile $i >perf-profile_$i.txt 2>&1
+            done
             ;;
         *)
             echo "Invalid subtool: $subtool"
