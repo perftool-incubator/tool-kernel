@@ -10,10 +10,10 @@ echo "hostname: `hostname`"
 echo
 
 # defaults
-subtools="perf"
+subtools="turbostat"
 perf_gen_local_report=0
 
-longopts="subtools,perf-record-opts:,perf-gen-local-report"
+longopts="subtools:,perf-record-opts:,perf-gen-local-report"
 opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
 if [ $? -ne 0 ]; then
     printf -- "\tUnrecognized option specified\n\n"
@@ -48,8 +48,13 @@ while true; do
     esac
 done
 
+echo "subtools: $subtools"
+
 date
 if [ -e kerneltools-pids.txt ]; then
+    echo "kerneltools-pids.txt:"
+    cat kerneltools-pids.txt
+    echo
     while read pid; do
         echo "Going to kill pid $pid"
         kill -s SIGINT $pid
@@ -77,6 +82,14 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
                 perf report 2>&1 >perf-report.txt
             fi
             xz --threads=0 perf.data
+            ;;
+        turbostat)
+            if [ -e turbostat-out.txt ]; then
+                echo "Compressing turbostat output"
+                xz turbostat-out.txt
+            else
+                echo "Warning: turbostat-out.txt was not found"
+            fi
             ;;
         *)
             echo "Invalid subtool: $subtool"

@@ -12,35 +12,56 @@ echo "mount:"
 mount
 echo
 # defaults
-subtools="perf,turbostat"
+subtools="turbostat" # subtools that will be used, any combination of: turbostat,perf,speed-select-util <no-spaces>
+interval=10
+record_opts=""
+base_freq=""
+core_power=""
+turbo_freq=""
 
-longopts="subtools,perf-record-opts:"
+longopts="subtools:,record-opts:,interval:,base-freq:,turbo-freq:,core-power:"
 opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
-if [ $? -ne 0 ]; then
-    printf -- "\tUnrecognized option specified\n\n"
-    exit 1
-fi
 eval set -- "$opts";
 while true; do
-    case "$1" in
+    arg="$1"
+    shift
+    case "$arg" in
         --subtools)
-            shift;
             subtools=$1
-            echo "subtools=$subtools"
             shift;
+            echo "setting subtools=$subtools"
             ;;
-        --perf-record-opts)
+        --record-opts)
+            record_opts=$1
             shift;
-            perf_record_opts=$1
-            echo "perf_record_opts=$perf_record_opts"
+            echo "setting record_opts=$record_opts"
+            ;;
+        --base-freq)
+            base_freq=$1
             shift;
+            echo "setting base_freq=$base_freq"
+            ;;
+        --core-power)
+            core_power=$1
+            shift;
+            echo "setting core_power=$core_power"
+            ;;
+        --turbo-freq)
+            turbo_freq=$1
+            shift;
+            echo "setting turbo_freq=$turbo_freq"
+            ;;
+        --interval)
+            interval=$1
+            shift;
+            echo "setting turbo_freq=$turbo_freq"
             ;;
         --)
             shift;
             break
             ;;
         *)
-            echo "Invalid option: $1"
+            echo "Invalid option: $arg"
             exit 1
     esac
 done
@@ -59,11 +80,51 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
             ;;
         turbostat)
             echo "Starting turbostat"
-            #/usr/bin/turbostat -d -e all -o turbostat-stdout.txt -i 3 </dev/null &
-            su -c /usr/bin/turbostat-start root &
+            nohup /usr/bin/turbostat -d -d -i $interval -o turbostat-stdout.txt  2>turbostat-stderr.txt &
             turbo_pid=$!
             echo "turbostat pid is $turbo_pid"
             echo "$turbo_pid" >>kerneltools-pids.txt
+            ;;
+        intel-speed-select)
+            echo "invoking intel-speed-select"
+            # get the settings before we change anything
+            /usr/bin/intel-speed-select perf-profile info -l 0 |& grep speed-select|grep ":"|sort|uniq >settings.txt
+            if [ ! -z "$base_freq" ]; then
+                if [ "$base_freq" == "enable" ]; then
+                    echo "running: /usr/bin/intel-speed-select base-freq enable -a"
+                    /usr/bin/intel-speed-select base-freq enable -a
+                elif [ "$base_freq" == "disable" ]; then
+                    echo "running: /usr/bin/intel-speed-select base-freq disable -a"
+                    /usr/bin/intel-speed-select base-freq disable -a
+                else
+                    echo "The value for argument --base-freq [$base_freq] is not supported"
+                fi
+            fi
+            if [ ! -z "$core_power" ]; then
+                if [ "$core_power" == "enable" ]; then
+                    echo "running: /usr/bin/intel-speed-select core-power enable -a"
+                    /usr/bin/intel-speed-select core-power enable -a
+                elif [ "$core_power" == "disable" ]; then
+                    echo "running: /usr/bin/intel-speed-select core-power disable -a"
+                    /usr/bin/intel-speed-select core-power disable -a
+                else
+                    echo "The value for argument --core-power [$core_power] is not supported"
+                fi
+            fi
+            if [ ! -z "$turbo_freq" ]; then
+                if [ "$turbo_freq" == "enable" ]; then
+                    echo "running: /usr/bin/intel-speed-select turbo-freq enable -a"
+                    /usr/bin/intel-speed-select turbo-freq enable -a
+                elif [ "$turbo_freq" == "disable" ]; then
+                    echo "running: /usr/bin/intel-speed-select turbo-freq disable -a"
+                    /usr/bin/intel-speed-select turbo-freq disable -a
+                else
+                    echo "The value for argument --turbo-freq [$turbo_freq] is not supported"
+                fi
+            fi
+            for i in info get-lock-status get-config-levels get-config-version get-config-enabled get-config-current-level; do
+                /usr/bin/intel-speed-select perf-profile $i >perf-profile_$i.txt 2>&1
+            done
             ;;
         *)
             echo "Invalid subtool: $subtool"
