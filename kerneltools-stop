@@ -13,7 +13,7 @@ echo
 subtools="turbostat"
 perf_gen_local_report=0
 
-longopts="subtools:,perf-record-opts:,perf-gen-local-report"
+longopts="subtools:,record-opts:,perf-gen-local-report"
 opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
 if [ $? -ne 0 ]; then
     printf -- "\tUnrecognized option specified\n\n"
