@@ -2,7 +2,10 @@
 exec >kerneltools-start-stderrout.txt
 exec 2>&1
 
-echo "args: $@"
+echo "args:"
+for i in "$@"; do
+    printf "[%s]\n" "$i"
+done
 echo
 echo "pwd: `/bin/pwd`"
 echo
@@ -19,45 +22,42 @@ base_freq=""
 core_power=""
 turbo_freq=""
 
+echo "Processing arguments"
 longopts="subtools:,record-opts:,interval:,base-freq:,turbo-freq:,core-power:"
 opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
 eval set -- "$opts";
 while true; do
     arg="$1"
     shift
+    val="$1"
+    shift
+    printf "arg: [%s]  val: [%s]\n" "$arg" "$val"
     case "$arg" in
         --subtools)
-            subtools=$1
-            shift;
+            subtools=$val
             echo "setting subtools=$subtools"
             ;;
         --record-opts)
-            record_opts=$1
-            shift;
+            record_opts=$val
             echo "setting record_opts=$record_opts"
             ;;
         --base-freq)
-            base_freq=$1
-            shift;
+            base_freq=$val
             echo "setting base_freq=$base_freq"
             ;;
         --core-power)
-            core_power=$1
-            shift;
+            core_power=$val
             echo "setting core_power=$core_power"
             ;;
         --turbo-freq)
-            turbo_freq=$1
-            shift;
+            turbo_freq=$val
             echo "setting turbo_freq=$turbo_freq"
             ;;
         --interval)
-            interval=$1
-            shift;
+            interval=$val
             echo "setting turbo_freq=$turbo_freq"
             ;;
         --)
-            shift;
             break
             ;;
         *)
@@ -72,8 +72,9 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
         perf)
             echo "Starting perf record"
             mkdir -p ~/.debug
-            echo going to run "/usr/bin/perf record -a $perf_record_opts"
-            /usr/bin/perf record -a $perf_record_opts &
+            cmd="/usr/bin/perf record -a $record_opts"
+            echo "Going to run $cmd"
+            $cmd &
             perf_pid=$!
             echo "perf pid is $perf_pid"
             echo "$perf_pid" >>kerneltools-pids.txt
