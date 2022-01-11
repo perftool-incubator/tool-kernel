@@ -15,12 +15,15 @@ echo "mount:"
 mount
 echo
 # defaults
-subtools="turbostat" # subtools that will be used, any combination of: turbostat,perf,speed-select-util <no-spaces>
+subtools="turbostat" # subtools that will be used, any combination of: turbostat,perf,speed-select-util,trace-cmd <no-spaces>
 interval=10
 record_opts=""
 base_freq=""
 core_power=""
 turbo_freq=""
+trace_cmd_tracer="function"
+trace_cmd_opts=""
+trace_cmd_functions="smp_call_function_many smp_call_function_any smp_call_function_single_async smp_call_function_single smp_call_function_single_interrupt"
 
 echo "Processing arguments"
 longopts="subtools:,record-opts:,interval:,base-freq:,turbo-freq:,core-power:"
@@ -128,6 +131,13 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
             for i in info get-lock-status get-config-levels get-config-version get-config-enabled get-config-current-level; do
                 /usr/bin/intel-speed-select perf-profile $i >perf-profile_$i.txt 2>&1
             done
+            ;;
+        trace-cmd)
+            echo "Starting trace-cmd"
+            echo "Available trace-cmd tracers:"
+            /usr/local/bin/trace-cmd list -t
+            echo "Starting function trace with functions: $trace_cmd_functions"
+            /usr/local/bin/trace-cmd start -l "$trace_cmd_functions" -p function
             ;;
         *)
             echo "Invalid subtool: $subtool"

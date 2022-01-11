@@ -100,6 +100,13 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
                 echo "Warning: turbostat-out.txt was not found"
             fi
             ;;
+        trace-cmd)
+            echo "Stopping trace-cmd"
+            /usr/local/bin/trace-cmd stop
+            echo "Generating trace-cmd report"
+            /usr/local/bin/trace-cmd show | xz -c >trace-cmd-show.txt.xz
+            /usr/local/bin/trace-cmd clear
+            ;;
         *)
             echo "Invalid subtool: $subtool"
             ;;
