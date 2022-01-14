@@ -8,7 +8,7 @@
         {
             "name": "default",
             "requirements": [
-                "bzip2_src", "bison_src", "gettext_src", "flex_src", "tools_src", "libtraceevent_src", "libtracefs_src"
+                "bzip2_src", "bison_src", "gettext_src", "flex_src", "tools_src", "libtraceevent_src", "libtracefs_src", "tracecmd_src", "bcc", "rt-trace-bpf"
             ]
         }
     ],
@@ -147,6 +147,24 @@
                     ]
                 }
             }
+        },
+        {
+            "name": "rt-trace-bpf",
+            "type": "manual",
+            "manual_info": {
+                "commands": [
+                    "git clone https://github.com/xzpeter/rt-trace-bpf.git"
+                ]
+            }
+        },
+        {
+          "name": "bcc",
+          "type": "distro",
+          "distro_info": {
+            "packages": [
+              "bcc", "bcc-tools"
+            ]
+          }
         }
     ]
 }
