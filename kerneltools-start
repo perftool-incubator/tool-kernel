@@ -21,7 +21,6 @@ record_opts=""
 base_freq=""
 core_power=""
 turbo_freq=""
-trace_cmd_tracer="function"
 trace_cmd_record_opts=""
 
 echo "Processing arguments"
