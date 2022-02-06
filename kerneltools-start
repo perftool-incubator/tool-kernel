@@ -22,10 +22,10 @@ base_freq=""
 core_power=""
 turbo_freq=""
 trace_cmd_tracer="function"
-trace_cmd_opts=""
+trace_cmd_record_opts=""
 
 echo "Processing arguments"
-longopts="subtools:,record-opts:,interval:,base-freq:,turbo-freq:,core-power:,trace-cmd-opts:"
+longopts="subtools:,record-opts:,interval:,base-freq:,turbo-freq:,core-power:,trace-cmd-record-opts:"
 opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
 eval set -- "$opts";
 while true; do
@@ -59,9 +59,9 @@ while true; do
             interval=$val
             echo "setting turbo_freq=$turbo_freq"
             ;;
-        --trace-cmd-opts)
-            trace_cmd_opts=$val
-            echo "setting trace_cmd_opts=$trace_cmd_opts"
+        --trace-cmd-record-opts)
+            trace_cmd_record_opts=$val
+            echo "setting trace_cmd_record_opts=$trace_cmd_record_opts"
             ;;
         --)
             break
@@ -141,14 +141,7 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
             /usr/local/bin/trace-cmd list -t
             echo "Starting function trace with functions: $trace_cmd_functions"
             cmd="/usr/local/bin/trace-cmd record"
-            cmd+=" -p function"
-            cmd+=" --func-stack"
-            cmd+=" -l smp_call_function_many"
-            cmd+=" -l smp_call_function_any"
-            cmd+=" -l smp_call_function_single_async"
-            cmd+=" -l smp_call_function_single"
-            cmd+=" -l smp_call_function_single_interrupt"
-            cmd+=" $trace_cmd_opts"
+            cmd+=" $trace_cmd_record_opts"
             echo "Going to run:"
             echo "$cmd"
             $cmd &
