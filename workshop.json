@@ -147,24 +147,6 @@
                     ]
                 }
             }
-        },
-        {
-            "name": "rt-trace-bpf",
-            "type": "manual",
-            "manual_info": {
-                "commands": [
-                    "git clone https://github.com/xzpeter/rt-trace-bpf.git"
-                ]
-            }
-        },
-        {
-          "name": "bcc",
-          "type": "distro",
-          "distro_info": {
-            "packages": [
-              "bcc", "bcc-tools"
-            ]
-          }
         }
     ]
 }
