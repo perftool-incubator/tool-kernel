@@ -77,9 +77,9 @@ if [ -e kerneltools-pids.txt ]; then
         done
     done <kerneltools-pids.txt
 else
-    echo "Could not find kerneltools-pids.txt"
     exit 1
 fi
+
 date
 
 for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
@@ -99,6 +99,13 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
             else
                 echo "Warning: turbostat-out.txt was not found"
             fi
+            ;;
+        trace-cmd)
+            echo "Generating trace-cmd report"
+            /usr/local/bin/trace-cmd report | xz -c >trace-cmd-report.txt.xz
+            xz -T 0 trace.dat
+            echo "Clearing trace buffers"
+            /usr/local/bin/trace-cmd clear
             ;;
         *)
             echo "Invalid subtool: $subtool"

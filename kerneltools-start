@@ -15,15 +15,16 @@ echo "mount:"
 mount
 echo
 # defaults
-subtools="turbostat" # subtools that will be used, any combination of: turbostat,perf,speed-select-util <no-spaces>
+subtools="turbostat" # subtools that will be used, any combination of: turbostat,perf,speed-select-util,trace-cmd <no-spaces>
 interval=10
 record_opts=""
 base_freq=""
 core_power=""
 turbo_freq=""
+trace_cmd_record_opts=""
 
 echo "Processing arguments"
-longopts="subtools:,record-opts:,interval:,base-freq:,turbo-freq:,core-power:"
+longopts="subtools:,record-opts:,interval:,base-freq:,turbo-freq:,core-power:,trace-cmd-record-opts:"
 opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
 eval set -- "$opts";
 while true; do
@@ -56,6 +57,10 @@ while true; do
         --interval)
             interval=$val
             echo "setting turbo_freq=$turbo_freq"
+            ;;
+        --trace-cmd-record-opts)
+            trace_cmd_record_opts=$val
+            echo "setting trace_cmd_record_opts=$trace_cmd_record_opts"
             ;;
         --)
             break
@@ -128,6 +133,20 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
             for i in info get-lock-status get-config-levels get-config-version get-config-enabled get-config-current-level; do
                 /usr/bin/intel-speed-select perf-profile $i >perf-profile_$i.txt 2>&1
             done
+            ;;
+        trace-cmd)
+            echo "Starting trace-cmd"
+            echo "Available trace-cmd tracers:"
+            /usr/local/bin/trace-cmd list -t
+            echo "Starting function trace with functions: $trace_cmd_functions"
+            cmd="/usr/local/bin/trace-cmd record"
+            cmd+=" $trace_cmd_record_opts"
+            echo "Going to run:"
+            echo "$cmd"
+            $cmd &
+            trace_pid=$!
+            echo "trace-cmd pid is $trace_pid"
+            echo "$trace_pid" >>kerneltools-pids.txt
             ;;
         *)
             echo "Invalid subtool: $subtool"
