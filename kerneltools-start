@@ -139,7 +139,7 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
             echo "Available trace-cmd tracers:"
             /usr/local/bin/trace-cmd list -t
             echo "Starting function trace with functions: $trace_cmd_functions"
-            cmd="/usr/local/bin/trace-cmd record"
+            cmd="/usr/local/bin/trace-cmd record --date"
             cmd+=" $trace_cmd_record_opts"
             echo "Going to run:"
             echo "$cmd"
