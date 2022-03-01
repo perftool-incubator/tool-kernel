@@ -82,6 +82,11 @@ fi
 
 date
 
+taskset_cmd=""
+if [ -n "${HK_CPUS}" -a -n "${WORKLOAD_CPUS}" ]; then
+    taskset_cmd="taskset -c ${HK_CPUS},${WORKLOAD_CPUS}"
+fi
+
 for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
     case "$subtool" in
         perf)
@@ -90,20 +95,20 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
             if [ "$perf_gen_local_report" == "1" ]; then
                 perf report 2>&1 >perf-report.txt
             fi
-            xz --threads=0 perf.data
+            ${taskset_cmd} xz --threads=0 perf.data
             ;;
         turbostat)
             if [ -e turbostat-out.txt ]; then
                 echo "Compressing turbostat output"
-                xz turbostat-out.txt
+                ${taskset_cmd} xz --threads=0 turbostat-out.txt
             else
                 echo "Warning: turbostat-out.txt was not found"
             fi
             ;;
         trace-cmd)
             echo "Generating trace-cmd report"
-            /usr/local/bin/trace-cmd report | xz -c >trace-cmd-report.txt.xz
-            xz -T 0 trace.dat
+            /usr/local/bin/trace-cmd report | ${taskset_cmd} xz --threads=0 --stdout > trace-cmd-report.txt.xz
+            ${taskset_cmd} xz --threads=0 trace.dat
             echo "Clearing trace buffers"
             /usr/local/bin/trace-cmd clear
             ;;
