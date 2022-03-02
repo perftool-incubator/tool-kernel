@@ -1,4 +1,7 @@
 #!/bin/bash
+# -*- mode: sh; indent-tabs-mode: nil; sh-basic-offset: 4 -*-
+# vim: autoindent tabstop=4 shiftwidth=4 expandtab softtabstop=4 filetype=bash
+
 exec >kerneltools-stop-stderrout.txt
 exec 2>&1
 
@@ -13,14 +16,23 @@ echo
 subtools="turbostat"
 record_opts=""
 perf_gen_local_report=0
+sysfs_trace_cleanup_cmds=()
 
-longopts="subtools:,record-opts:,interval:,base-freq:,turbo-freq:,core-power:,perf-gen-local-report"
+longopts="subtools:,record-opts:,interval:,base-freq:,turbo-freq:,core-power:,perf-gen-local-report,sysfs-trace-setup:,sysfs-trace-cleanup:"
 opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
 eval set -- "$opts";
 while true; do
     arg=$1
     shift
     case "$arg" in
+        --sysfs-trace-cleanup)
+            sysfs_trace_cleanup_cmds+=("$1")
+            echo "appending '$1' to sysfs_trace_cleanup_cmds"
+            shift;
+            ;;
+        --sysfs-trace-setup)
+            shift;
+            ;;
         --subtools)
             subtools=$1
             shift;
@@ -60,23 +72,31 @@ done
 echo "subtools: $subtools"
 
 date
-if [ -e kerneltools-pids.txt ]; then
-    echo "kerneltools-pids.txt:"
-    cat kerneltools-pids.txt
+pids_file="kerneltools-pids.txt"
+if [ -e ${pids_file} ]; then
+    echo "${pids_file}:"
+    cat ${pids_file}
     echo
     while read pid; do
-        echo "Going to kill pid $pid"
-        kill -s SIGINT $pid
-        sleep 5
-        count=1
-        while [ $count -lt 20 -a -e /proc/$pid ]; do
-            echo "pgrep $perf:"
-            pgrep perf
-            let count=$count+1
-            sleep 3
-        done
-    done <kerneltools-pids.txt
+        if [ -n "${pid}" ]; then
+            echo "Going to kill pid $pid"
+            kill -s SIGINT $pid
+            sleep 5
+            count=1
+            while [ $count -lt 20 -a -e /proc/$pid ]; do
+                echo -n "."
+                let count=$count+1
+                sleep 3
+            done
+            if [ ${count} -gt 1 ]; then
+                echo
+            fi
+        else
+            echo "Skipping blank pid line"
+        fi
+    done <${pids_file}
 else
+    echo "ERROR: could not find ${pids_file}"
     exit 1
 fi
 
@@ -84,7 +104,10 @@ date
 
 taskset_cmd=""
 if [ -n "${HK_CPUS}" -a -n "${WORKLOAD_CPUS}" ]; then
+    echo "cpu-partitioning detected: Combining HK_CPUS and WORKLOAD_CPUS for taskset binding"
     taskset_cmd="taskset -c ${HK_CPUS},${WORKLOAD_CPUS}"
+else
+    echo "cpu-partitioning not detected"
 fi
 
 for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
@@ -111,6 +134,37 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
             ${taskset_cmd} xz --threads=0 trace.dat
             echo "Clearing trace buffers"
             /usr/local/bin/trace-cmd clear
+            ;;
+        sysfs-trace)
+            output_dir=$(pwd)
+
+            echo "Collecting sysfs-trace data"
+
+            if pushd /sys/kernel/debug/tracing > /dev/null; then
+                echo "Making sure tracing is really off"
+                echo 0 > tracing_on
+
+                echo "Capturing trace buffer"
+                cat trace | ${taskset_cmd} xz --threads=0 --stdout > ${output_dir}/trace.out.xz
+
+                echo "Clearing trace buffers"
+                echo > trace
+
+                for val in "${sysfs_trace_cleanup_cmds[@]}"; do
+                    echo "Running '${val}'"
+                    eval ${val}
+                    RC=$?
+                    if [ "${RC}" != "0" ]; then
+                           echo "ERROR: Command returned '${RC}'"
+                           exit ${RC}
+                    fi
+                done
+
+                popd > /dev/null
+            else
+                echo "ERROR: Is tracing enabled?"
+                exit 1
+            fi
             ;;
         *)
             echo "Invalid subtool: $subtool"

@@ -1,4 +1,7 @@
 #!/bin/bash
+# -*- mode: sh; indent-tabs-mode: nil; sh-basic-offset: 4 -*-
+# vim: autoindent tabstop=4 shiftwidth=4 expandtab softtabstop=4 filetype=bash
+
 exec >kerneltools-start-stderrout.txt
 exec 2>&1
 
@@ -15,16 +18,17 @@ echo "mount:"
 mount
 echo
 # defaults
-subtools="turbostat" # subtools that will be used, any combination of: turbostat,perf,speed-select-util,trace-cmd <no-spaces>
+subtools="turbostat" # subtools that will be used, any combination of: turbostat,perf,speed-select-util,trace-cmd,sysfs-trace <no-spaces>
 interval=10
 record_opts=""
 base_freq=""
 core_power=""
 turbo_freq=""
 trace_cmd_record_opts=""
+sysfs_trace_setup_cmds=()
 
 echo "Processing arguments"
-longopts="subtools:,record-opts:,interval:,base-freq:,turbo-freq:,core-power:,trace-cmd-record-opts:"
+longopts="subtools:,record-opts:,interval:,base-freq:,turbo-freq:,core-power:,trace-cmd-record-opts:,sysfs-trace-setup:,sysfs-trace-cleanup:"
 opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
 eval set -- "$opts";
 while true; do
@@ -34,6 +38,12 @@ while true; do
     shift
     printf "arg: [%s]  val: [%s]\n" "$arg" "$val"
     case "$arg" in
+        --sysfs-trace-cleanup)
+            ;;
+        --sysfs-trace-setup)
+            sysfs_trace_setup_cmds+=("$val")
+            echo "appending '$val' to sysfs_trace_setup_cmds"
+            ;;
         --subtools)
             subtools=$val
             echo "setting subtools=$subtools"
@@ -147,6 +157,37 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
             trace_pid=$!
             echo "trace-cmd pid is $trace_pid"
             echo "$trace_pid" >>kerneltools-pids.txt
+            ;;
+        sysfs-trace)
+            echo "Making sure debugfs is mounted"
+            mount --verbose --type debugfs none /sys/kernel/debug
+
+            echo "Configuring sysfs-trace"
+
+            if pushd /sys/kernel/debug/tracing > /dev/null; then
+                echo "Making sure tracing is really off"
+                echo 0 > tracing_on
+
+                echo "Clearing existing trace buffers"
+                echo > trace
+
+                for val in "${sysfs_trace_setup_cmds[@]}"; do
+                    echo "Running '${val}'"
+                    eval ${val}
+                    RC=$?
+                    if [ "${RC}" != "0" ]; then
+                        echo "ERROR: Command returned '${RC}'"
+                        exit ${RC}
+                    fi
+                done
+
+                popd > /dev/null
+            else
+                echo "ERROR: Is tracing enabled?"
+                exit 1
+            fi
+
+            touch kerneltools-pids.txt
             ;;
         *)
             echo "Invalid subtool: $subtool"
