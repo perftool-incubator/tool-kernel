@@ -13,14 +13,23 @@ echo
 subtools="turbostat"
 record_opts=""
 perf_gen_local_report=0
+sysfs_trace_cleanup_cmds=()
 
-longopts="subtools:,record-opts:,interval:,base-freq:,turbo-freq:,core-power:,perf-gen-local-report"
+longopts="subtools:,record-opts:,interval:,base-freq:,turbo-freq:,core-power:,perf-gen-local-report,sysfs-trace-setup:,sysfs-trace-cleanup:"
 opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
 eval set -- "$opts";
 while true; do
     arg=$1
     shift
     case "$arg" in
+        --sysfs-trace-cleanup)
+            sysfs_trace_cleanup_cmds+=("$1")
+            echo "appending '$1' to sysfs_trace_cleanup_cmds"
+            shift;
+            ;;
+        --sysfs-trace-setup)
+            shift;
+            ;;
         --subtools)
             subtools=$1
             shift;
@@ -122,6 +131,37 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
             ${taskset_cmd} xz --threads=0 trace.dat
             echo "Clearing trace buffers"
             /usr/local/bin/trace-cmd clear
+            ;;
+        sysfs-trace)
+            output_dir=$(pwd)
+
+            echo "Collecting sysfs-trace data"
+
+            if pushd /sys/kernel/debug/tracing > /dev/null; then
+                echo "Making sure tracing is really off"
+                echo 0 > tracing_on
+
+                echo "Capturing trace buffer"
+                cat trace | ${taskset_cmd} xz --threads=0 --stdout > ${output_dir}/trace.out.xz
+
+                echo "Clearing trace buffers"
+                echo > trace
+
+                for val in "${sysfs_trace_cleanup_cmds[@]}"; do
+                    echo "Running '${val}'"
+                    eval ${val}
+                    RC=$?
+                    if [ "${RC}" != "0" ]; then
+                           echo "ERROR: Command returned '${RC}'"
+                           exit ${RC}
+                    fi
+                done
+
+                popd > /dev/null
+            else
+                echo "ERROR: Is tracing enabled?"
+                exit 1
+            fi
             ;;
         *)
             echo "Invalid subtool: $subtool"
