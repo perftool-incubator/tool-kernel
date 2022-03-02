@@ -92,7 +92,10 @@ date
 
 taskset_cmd=""
 if [ -n "${HK_CPUS}" -a -n "${WORKLOAD_CPUS}" ]; then
+    echo "cpu-partitioning detected: Combining HK_CPUS and WORKLOAD_CPUS for taskset binding"
     taskset_cmd="taskset -c ${HK_CPUS},${WORKLOAD_CPUS}"
+else
+    echo "cpu-partitioning not detected"
 fi
 
 for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
