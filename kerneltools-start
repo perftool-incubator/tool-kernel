@@ -171,6 +171,7 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
                 echo "Clearing existing trace buffers"
                 echo > trace
 
+                echo "Executing sysfs-trace-setup commands:"
                 for val in "${sysfs_trace_setup_cmds[@]}"; do
                     echo "Running '${val}'"
                     eval ${val}

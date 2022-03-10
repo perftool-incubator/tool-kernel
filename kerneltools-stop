@@ -17,14 +17,19 @@ subtools="turbostat"
 record_opts=""
 perf_gen_local_report=0
 sysfs_trace_cleanup_cmds=()
+sysfs_trace_collection="per-cpu"
 
-longopts="subtools:,record-opts:,interval:,base-freq:,turbo-freq:,core-power:,perf-gen-local-report,sysfs-trace-setup:,sysfs-trace-cleanup:"
+longopts="subtools:,record-opts:,interval:,base-freq:,turbo-freq:,core-power:,perf-gen-local-report,sysfs-trace-setup:,sysfs-trace-cleanup:,sysfs-trace-collection:"
 opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
 eval set -- "$opts";
 while true; do
     arg=$1
     shift
     case "$arg" in
+        --sysfs-trace-collection)
+            sysfs_trace_collection=$1
+            shift;
+            ;;
         --sysfs-trace-cleanup)
             sysfs_trace_cleanup_cmds+=("$1")
             echo "appending '$1' to sysfs_trace_cleanup_cmds"
@@ -144,12 +149,36 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
                 echo "Making sure tracing is really off"
                 echo 0 > tracing_on
 
-                echo "Capturing trace buffer"
-                cat trace | ${taskset_cmd} xz --threads=0 --stdout > ${output_dir}/trace.out.xz
+                case "${sysfs_trace_collection}" in
+                    "system")
+                        echo "Capturing system wide trace buffer"
 
-                echo "Clearing trace buffers"
+                        cat trace | ${taskset_cmd} xz --threads=0 --stdout > ${output_dir}/trace.out.xz
+                        ;;
+                    "per-cpu"|*)
+                        echo "Capturing per-cpu trace buffers"
+
+                        tracing_cpumask=$(cat tracing_cpumask)
+                        tracing_cpus=$(${TOOLBOX_HOME}/bin/cpumask.py --type hexmask --cpus ${tracing_cpumask})
+                        echo "Tracing CPUs:"
+                        echo -e "${tracing_cpus}"
+                        tracing_cpus=$(echo -e "${tracing_cpus}" | grep cpulist | awk -F= '{ print $2 }' | sed -e "s/,/ /g")
+
+                        for tracing_cpu in ${tracing_cpus}; do
+                            echo "Processing CPU ${tracing_cpu}"
+                            echo -e "\tCapturing trace buffer"
+                            cat per_cpu/cpu${tracing_cpu}/trace | ${taskset_cmd} xz --threads=0 --stdout > ${output_dir}/trace.cpu${tracing_cpu}.out.xz
+
+                            echo -e "\tClearing trace buffer"
+                            echo > per_cpu/cpu${tracing_cpu}/trace
+                        done
+                        ;;
+                esac
+
+                echo "Clearing trace buffer"
                 echo > trace
 
+                echo "Executing sysfs-trace-cleanup commands:"
                 for val in "${sysfs_trace_cleanup_cmds[@]}"; do
                     echo "Running '${val}'"
                     eval ${val}
