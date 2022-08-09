@@ -136,11 +136,11 @@
             "name": "tracecmd_src",
             "type": "source",
             "source_info": {
-                "url": "https://git.kernel.org/pub/scm/linux/kernel/git/rostedt/trace-cmd.git/snapshot/trace-cmd-v2.9.4.tar.gz",
-                "filename": "trace-cmd-v2.9.4.tar.gz",
+                "url": "https://git.kernel.org/pub/scm/utils/trace-cmd/trace-cmd.git/snapshot/trace-cmd-v3.1.2.tar.gz",
+                "filename": "trace-cmd.tar.gz",
                 "commands": {
-                    "unpack": "tar -zxf trace-cmd-v2.9.4.tar.gz",
-                    "get_dir": "tar -ztf trace-cmd-v2.9.4.tar.gz | head -n 1",
+                    "unpack": "tar -zxf trace-cmd.tar.gz",
+                    "get_dir": "tar -ztf trace-cmd.tar.gz | head -n 1",
                     "commands": [
                         "make install",
                         "ldconfig"
