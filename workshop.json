@@ -104,11 +104,11 @@
             "name": "libtraceevent_src",
             "type": "source",
             "source_info": {
-                "url": "https://git.kernel.org/pub/scm/libs/libtrace/libtraceevent.git/snapshot/libtraceevent-1.5.0.tar.gz",
-                "filename": "libtraceevent-1.5.0.tar.gz",
+                "url": "https://git.kernel.org/pub/scm/libs/libtrace/libtraceevent.git/snapshot/libtraceevent-1.6.2.tar.gz",
+                "filename": "libtraceevent.tar.gz",
                 "commands": {
-                    "unpack": "tar -zxf libtraceevent-1.5.0.tar.gz",
-                    "get_dir": "tar -ztf libtraceevent-1.5.0.tar.gz | head -n 1",
+                    "unpack": "tar -zxf libtraceevent.tar.gz",
+                    "get_dir": "tar -ztf libtraceevent.tar.gz | head -n 1",
                     "commands": [
                         "make install",
                         "ldconfig"
@@ -120,11 +120,11 @@
             "name": "libtracefs_src",
             "type": "source",
             "source_info": {
-                "url": "https://git.kernel.org/pub/scm/libs/libtrace/libtracefs.git/snapshot/libtracefs-1.2.5.tar.gz",
-                "filename": "libtracefs-1.2.5.tar.gz",
+                "url": "https://git.kernel.org/pub/scm/libs/libtrace/libtracefs.git/snapshot/libtracefs-1.4.2.tar.gz",
+                "filename": "libtracefs.tar.gz",
                 "commands": {
-                    "unpack": "tar -zxf libtracefs-1.2.5.tar.gz",
-                    "get_dir": "tar -ztf libtracefs-1.2.5.tar.gz | head -n 1",
+                    "unpack": "tar -zxf libtracefs.tar.gz",
+                    "get_dir": "tar -ztf libtracefs.tar.gz | head -n 1",
                     "commands": [
                         "make install",
                         "ldconfig"
@@ -136,11 +136,11 @@
             "name": "tracecmd_src",
             "type": "source",
             "source_info": {
-                "url": "https://git.kernel.org/pub/scm/linux/kernel/git/rostedt/trace-cmd.git/snapshot/trace-cmd-v2.9.4.tar.gz",
-                "filename": "trace-cmd-v2.9.4.tar.gz",
+                "url": "https://git.kernel.org/pub/scm/utils/trace-cmd/trace-cmd.git/snapshot/trace-cmd-v3.1.2.tar.gz",
+                "filename": "trace-cmd.tar.gz",
                 "commands": {
-                    "unpack": "tar -zxf trace-cmd-v2.9.4.tar.gz",
-                    "get_dir": "tar -ztf trace-cmd-v2.9.4.tar.gz | head -n 1",
+                    "unpack": "tar -zxf trace-cmd.tar.gz",
+                    "get_dir": "tar -ztf trace-cmd.tar.gz | head -n 1",
                     "commands": [
                         "make install",
                         "ldconfig"
