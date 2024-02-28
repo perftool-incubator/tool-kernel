@@ -8,7 +8,7 @@
         {
             "name": "default",
             "requirements": [
-                "bzip2_src", "bison_src", "gettext_src", "flex_src", "tools_src", "libtraceevent_src", "libtracefs_src", "tracecmd_src"
+                "bzip2_src", "bison_src", "gettext_src", "flex_src", "libtraceevent_src", "libtracefs_src", "tracecmd_src", "tools_src"
             ]
         }
     ],
@@ -18,13 +18,14 @@
             "type": "source",
             "source_info": {
                 "url": "https://www.sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz",
-                "filename": "bzip2-1.0.8.tar.gz",
+                "filename": "bzip2.tar.gz",
                 "commands": {
-                    "unpack": "tar -zxf bzip2-1.0.8.tar.gz",
-                    "get_dir": "tar -ztf bzip2-1.0.8.tar.gz | head -n 1 | awk -F/ '{print $1}'",
+                    "unpack": "tar -xf bzip2.tar.gz",
+                    "get_dir": "tar -tf bzip2.tar.gz | head -n 1 | awk -F/ '{print $1}'",
                     "commands": [
-                        "make install",
-                        "ldconfig"
+                        "make -j32 install",
+                        "ldconfig",
+                        "rm -rf *"
                     ]
                 }
             }
@@ -33,16 +34,17 @@
             "name": "bison_src",
             "type": "source",
             "source_info": {
-                "url": "http://ftp.gnu.org/gnu/bison/bison-3.7.tar.xz",
-                "filename": "bison-3.7.tar.xz",
+                "url": "https://ftp.gnu.org/gnu/bison/bison-3.8.2.tar.xz",
+                "filename": "bison.tar.xz",
                 "commands": {
-                    "unpack": "tar -Jxf bison-3.7.tar.xz",
-                    "get_dir": "tar -Jtf bison-3.7.tar.xz | head -n 1",
+                    "unpack": "tar -xf bison.tar.xz",
+                    "get_dir": "tar -tf bison.tar.xz | head -n 1",
                     "commands": [
                         "./configure",
-                        "make install",
-                        "ldconfig"
-                    ]
+                        "make -j32 install",
+                        "ldconfig",
+                        "rm -rf *"
+                     ]
                 }
             }
         },
@@ -50,15 +52,16 @@
             "name": "gettext_src",
             "type": "source",
             "source_info": {
-                "url": "https://ftp.gnu.org/pub/gnu/gettext/gettext-0.21.tar.gz",
-                "filename": "gettext-0.21.tar.gz",
+                "url": "https://ftp.gnu.org/pub/gnu/gettext/gettext-0.22.4.tar.xz",
+                "filename": "gettext.tar.xz",
                 "commands": {
-                    "unpack": "tar -zxf gettext-0.21.tar.gz",
-                    "get_dir": "tar -ztf gettext-0.21.tar.gz | head -n 1",
+                    "unpack": "tar -xf gettext.tar.xz",
+                    "get_dir": "tar -tf gettext.tar.xz | head -n 1",
                     "commands": [
                         "./configure",
-                        "make install",
-                        "ldconfig"
+                        "make -j32 install",
+                        "ldconfig",
+                        "rm -rf *"
                     ]
                 }
             }
@@ -68,32 +71,14 @@
             "type": "source",
             "source_info": {
                 "url": "https://github.com/westes/flex/files/981163/flex-2.6.4.tar.gz",
-                "filename": "flex-2.6.4.tar.gz",
+                "filename": "flex.tar.gz",
                 "commands": {
-                    "unpack": "tar -zxf flex-2.6.4.tar.gz",
-                    "get_dir": "tar -ztf flex-2.6.4.tar.gz | head -n 1",
+                    "unpack": "tar -xf flex.tar.gz",
+                    "get_dir": "tar -tf flex.tar.gz | head -n 1",
                     "commands": [
                         "./autogen.sh",
                         "./configure CFLAGS=' -D_GNU_SOURCE'",
-                        "make install",
-                        "ldconfig"
-                    ]
-                }
-            }
-        },
-        {
-            "name": "tools_src",
-            "type": "source",
-            "source_info": {
-                "url": "https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.10.5.tar.xz",
-                "filename": "linux-5.7.tar.xz",
-                "commands": {
-                    "unpack": "tar -Jxf linux-5.7.tar.xz",
-                    "get_dir": "tar -Jtf linux-5.7.tar.xz | head -n 1",
-                    "commands": [
-                        "make -C tools/ perf_install prefix=/usr/",
-                        "make -C tools/ turbostat_install prefix=/usr/",
-                        "make -C tools/ intel-speed-select_install prefix=/usr/",
+                        "make -j32 install",
                         "ldconfig",
                         "rm -rf *"
                     ]
@@ -104,14 +89,15 @@
             "name": "libtraceevent_src",
             "type": "source",
             "source_info": {
-                "url": "https://git.kernel.org/pub/scm/libs/libtrace/libtraceevent.git/snapshot/libtraceevent-1.6.2.tar.gz",
+                "url": "https://git.kernel.org/pub/scm/libs/libtrace/libtraceevent.git/snapshot/libtraceevent-1.8.2.tar.gz",
                 "filename": "libtraceevent.tar.gz",
                 "commands": {
-                    "unpack": "tar -zxf libtraceevent.tar.gz",
-                    "get_dir": "tar -ztf libtraceevent.tar.gz | head -n 1",
+                    "unpack": "tar -xf libtraceevent.tar.gz",
+                    "get_dir": "tar -tf libtraceevent.tar.gz | head -n 1",
                     "commands": [
-                        "make install",
-                        "ldconfig"
+                        "make -j32 install",
+                        "ldconfig",
+                        "rm -rf *"
                     ]
                 }
             }
@@ -120,14 +106,15 @@
             "name": "libtracefs_src",
             "type": "source",
             "source_info": {
-                "url": "https://git.kernel.org/pub/scm/libs/libtrace/libtracefs.git/snapshot/libtracefs-1.4.2.tar.gz",
+                "url": "https://git.kernel.org/pub/scm/libs/libtrace/libtracefs.git/snapshot/libtracefs-1.8.0.tar.gz",
                 "filename": "libtracefs.tar.gz",
                 "commands": {
-                    "unpack": "tar -zxf libtracefs.tar.gz",
-                    "get_dir": "tar -ztf libtracefs.tar.gz | head -n 1",
+                    "unpack": "tar -xf libtracefs.tar.gz",
+                    "get_dir": "tar -tf libtracefs.tar.gz | head -n 1",
                     "commands": [
-                        "make install",
-                        "ldconfig"
+                        "make -j32 install",
+                        "ldconfig",
+                        "rm -rf *"
                     ]
                 }
             }
@@ -136,14 +123,33 @@
             "name": "tracecmd_src",
             "type": "source",
             "source_info": {
-                "url": "https://git.kernel.org/pub/scm/utils/trace-cmd/trace-cmd.git/snapshot/trace-cmd-v3.1.2.tar.gz",
+                "url": "https://git.kernel.org/pub/scm/utils/trace-cmd/trace-cmd.git/snapshot/trace-cmd-libtracecmd-1.5.1.tar.gz",
                 "filename": "trace-cmd.tar.gz",
                 "commands": {
-                    "unpack": "tar -zxf trace-cmd.tar.gz",
-                    "get_dir": "tar -ztf trace-cmd.tar.gz | head -n 1",
+                    "unpack": "tar -xf trace-cmd.tar.gz",
+                    "get_dir": "tar -tf trace-cmd.tar.gz | head -n 1",
                     "commands": [
-                        "make install",
-                        "ldconfig"
+                        "make -j32 install",
+                        "ldconfig",
+                        "rm -rf *"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "tools_src",
+            "type": "source",
+            "source_info": {
+                "url": "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.7.5.tar.xz",
+                "filename": "linux.tar.xz",
+                "commands": {
+                    "unpack": "tar -xf linux.tar.xz",
+                    "get_dir": "tar -tf linux.tar.xz | head -n 1",
+                    "commands": [
+                        "cd tools/perf; make -j32 install prefix=/usr/",
+                        "cd tools/power/x86/turbostat; make install prefix=/usr/",
+                        "cd tools/power/x86/intel-speed-select; make install prefix=/usr/",
+                        "rm -rf *"
                     ]
                 }
             }
