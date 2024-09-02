@@ -147,8 +147,8 @@
                     "get_dir": "tar -tf linux.tar.xz | head -n 1",
                     "commands": [
                         "cd tools/perf; make -j32 install prefix=/usr/",
-                        "cd tools/power/x86/turbostat; make install prefix=/usr/",
-                        "cd tools/power/x86/intel-speed-select; make install prefix=/usr/",
+                        "cd tools/power/x86/turbostat && make install prefix=/usr/ || true",
+                        "cd tools/power/x86/intel-speed-select && make install prefix=/usr/ || true",
                         "rm -rf *"
                     ]
                 }
