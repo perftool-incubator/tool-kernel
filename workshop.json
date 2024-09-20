@@ -140,7 +140,7 @@
             "name": "tools_src",
             "type": "source",
             "source_info": {
-                "url": "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.7.5.tar.xz",
+                "url": "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.10.11.tar.xz",
                 "filename": "linux.tar.xz",
                 "commands": {
                     "unpack": "tar -xf linux.tar.xz",
