@@ -40,7 +40,7 @@
                     "unpack": "tar -xf bison.tar.xz",
                     "get_dir": "tar -tf bison.tar.xz | head -n 1",
                     "commands": [
-                        "./configure",
+                        "./configure gl_cv_func_getcwd_path_max='yes, but with shorter paths'",
                         "make -j32 install",
                         "ldconfig",
                         "rm -rf *"
@@ -58,7 +58,7 @@
                     "unpack": "tar -xf gettext.tar.xz",
                     "get_dir": "tar -tf gettext.tar.xz | head -n 1",
                     "commands": [
-                        "./configure",
+                        "./configure gl_cv_func_getcwd_path_max='yes, but with shorter paths'",
                         "make -j32 install",
                         "ldconfig",
                         "rm -rf *"
