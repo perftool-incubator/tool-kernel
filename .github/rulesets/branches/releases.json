@@ -9,8 +9,7 @@
     "ref_name": {
       "exclude": [],
       "include": [
-        "refs/heads/20[2-9][0-9]\\.[1234]",
-        "refs/heads/ci-version-test"
+        "refs/heads/20[2-9][0-9]\\.[1234]"
       ]
     }
   },
