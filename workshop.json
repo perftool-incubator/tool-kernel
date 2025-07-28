@@ -140,13 +140,13 @@
             "name": "tools_src",
             "type": "source",
             "source_info": {
-                "url": "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.10.11.tar.xz",
+                "url": "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.12.31.tar.xz",
                 "filename": "linux.tar.xz",
                 "commands": {
                     "unpack": "tar -xf linux.tar.xz",
                     "get_dir": "tar -tf linux.tar.xz | head -n 1",
                     "commands": [
-                        "cd tools/perf; make -j32 install prefix=/usr/",
+                        "cd tools/perf; make install prefix=/usr/",
                         "if [ \"$(uname -m)\" == \"x86_64\" ]; then cd tools/power/x86/turbostat; make install prefix=/usr/; else echo 'Skipping turbostat build since not x86'; fi",
                         "if [ \"$(uname -m)\" == \"x86_64\" ]; then cd tools/power/x86/intel-speed-select; make install prefix=/usr/; else echo 'Skipping intel-speed-select build since not x86'; fi",
                         "rm -rf *"
