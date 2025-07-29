@@ -8,11 +8,34 @@
         {
             "name": "default",
             "requirements": [
-                "bzip2_src", "bison_src", "gettext_src", "flex_src", "libtraceevent_src", "libtracefs_src", "tracecmd_src", "tools_src"
+		"packages",
+                "bzip2_src",
+		"bison_src",
+		"gettext_src",
+		"flex_src",
+		"libtraceevent_src",
+		"libtracefs_src",
+		"tracecmd_src",
+		"tools_src"
             ]
         }
     ],
     "requirements": [
+        {
+            "name": "packages",
+            "type": "distro",
+            "distro_info": {
+                "packages": [
+		    "which",
+		    "elfutils-devel",
+		    "libunwind-devel",
+		    "perl-devel",
+		    "python3-devel",
+		    "python3-setuptools",
+		    "llvm-devel"
+		]
+            }
+        },
         {
             "name": "bzip2_src",
             "type": "source",
