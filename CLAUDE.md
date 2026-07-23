@@ -13,8 +13,9 @@ Wrapper scripts for Linux kernel profiling tools (perf, turbostat, intel-speed-s
 | `kerneltools-start` | Launches configured subtools with parameters for interval, recording options, frequencies |
 | `kerneltools-stop` | Kills collectors, generates perf archives, trace-cmd reports, compresses output with xz |
 | `boot_to_epoch.py` | Converts between boot time and Unix epoch for perf time filtering |
-| `rickshaw.json` | Rickshaw integration: endpoint allow/block lists, file deployment |
+| `rickshaw.json` | Rickshaw integration: endpoint allow/block lists, file deployment, post-process registration |
 | `workshop.json` | Engine image build: distro packages and kernel source compilation for perf/turbostat |
+| `turbostat-post-process.py` | CDM post-processor: parses turbostat TSV output, emits per-CPU and system-aggregate metrics |
 
 ## Configuration
 - `--subtools <list>` — Comma-separated subtools (default: `turbostat`)
@@ -27,4 +28,4 @@ Wrapper scripts for Linux kernel profiling tools (perf, turbostat, intel-speed-s
 - Primary branch is `master`
 - Runs as a profiler tool on master/worker/profiler roles, blocked on client/server
 - Standard Bash modelines and 4-space indentation
-- No post-process script — processing happens at stop time
+- CDM post-processing via `turbostat-post-process.py`, registered in `rickshaw.json` as `controller.post-script`
