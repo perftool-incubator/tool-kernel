@@ -18,7 +18,7 @@ echo "mount:"
 mount
 echo
 # defaults
-subtools="turbostat" # subtools that will be used, any combination of: turbostat,perf,speed-select-util,trace-cmd,sysfs-trace <no-spaces>
+subtools="turbostat" # subtools that will be used, any combination of: turbostat,tcp-probe,perf,speed-select-util,trace-cmd,sysfs-trace <no-spaces>
 interval=10
 record_opts=""
 base_freq=""
@@ -102,6 +102,17 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
             turbo_pid=$!
             echo "turbostat pid is $turbo_pid"
             echo "$turbo_pid" >>kerneltools-pids.txt
+            ;;
+        tcp-probe)
+            echo "Starting tcp-probe (ss polling every ${interval}s)"
+            (while true; do
+                printf "=== %s ===\n" "$(date +%s%3N)"
+                /usr/sbin/ss -t -i -n 2>&1
+                sleep "$interval"
+            done) >>tcp-probe-stdout.txt 2>&1 &
+            tcp_probe_pid=$!
+            echo "tcp-probe pid is $tcp_probe_pid"
+            echo "$tcp_probe_pid" >>kerneltools-pids.txt
             ;;
         intel-speed-select)
             echo "invoking intel-speed-select"

@@ -45,6 +45,6 @@
       }
 },
     "controller": {
-        "post-script": "%tool-dir%turbostat-post-process.py"
+        "post-script": "%tool-dir%kerneltools-post-process.py"
     }
 }

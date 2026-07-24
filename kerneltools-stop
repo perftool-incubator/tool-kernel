@@ -133,6 +133,14 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
                 echo "Warning: turbostat-stdout.txt was not found"
             fi
             ;;
+        tcp-probe)
+            if [ -e tcp-probe-stdout.txt ]; then
+                echo "Compressing tcp-probe output"
+                ${taskset_cmd} xz --threads=0 tcp-probe-stdout.txt
+            else
+                echo "Warning: tcp-probe-stdout.txt was not found"
+            fi
+            ;;
         trace-cmd)
             echo "Generating trace-cmd report"
             /usr/local/bin/trace-cmd report | ${taskset_cmd} xz --threads=0 --stdout > trace-cmd-report.txt.xz
