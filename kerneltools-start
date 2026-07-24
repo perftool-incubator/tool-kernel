@@ -117,10 +117,7 @@ print('%.6f %.6f' % (mono, epoch))
 " > tcp-probe-data/clock_offset.txt
             echo "Clock offset: $(cat tcp-probe-data/clock_offset.txt)"
 
-            bt_script="$(dirname $(which kerneltools-start))/../tcp-probe.bt"
-            if [ ! -f "$bt_script" ]; then
-                bt_script="/opt/toolbox/tcp-probe.bt"
-            fi
+            bt_script="$(dirname $(which kerneltools-start))/tcp-probe.bt"
             if [ ! -f "$bt_script" ]; then
                 echo "ERROR: tcp-probe.bt not found"
                 touch kerneltools-pids.txt

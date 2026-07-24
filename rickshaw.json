@@ -14,6 +14,10 @@
             {
                 "src": "%tool-dir%/kerneltools-stop",
                 "dest": "/usr/bin/"
+            },
+            {
+                "src": "%tool-dir%/tcp-probe.bt",
+                "dest": "/usr/bin/"
             }
         ],
         "blacklist": [
