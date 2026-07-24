@@ -8,7 +8,9 @@
         {
             "name": "default",
             "requirements": [
-		"packages"
+		"packages",
+		"bpftrace-build-dependencies",
+		"bpftrace_src"
             ]
         }
     ],
@@ -156,6 +158,44 @@
                     "commands": [
                         "make -j32 install",
                         "ldconfig",
+                        "rm -rf *"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "bpftrace-build-dependencies",
+            "type": "distro",
+            "distro_info": {
+                "packages": [
+                    "bcc-devel",
+                    "binutils-devel",
+                    "bpftool",
+                    "cereal-devel",
+                    "clang-devel",
+                    "cmake",
+                    "gcc-c++",
+                    "libbpf-devel",
+                    "libbpf-static",
+                    "libzstd-devel",
+                    "pahole",
+                    "zlib-devel"
+                ]
+            }
+        },
+        {
+            "name": "bpftrace_src",
+            "type": "source",
+            "source_info": {
+                "url": "https://github.com/bpftrace/bpftrace/archive/refs/tags/v0.26.1.tar.gz",
+                "filename": "bpftrace.tar.gz",
+                "commands": {
+                    "unpack": "tar -xf bpftrace.tar.gz",
+                    "get_dir": "tar -tf bpftrace.tar.gz | head -n 1 | awk -F/ '{print $1}'",
+                    "commands": [
+                        "cmake -B build -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release -DUSE_SYSTEM_LIBBPF=On",
+                        "make -C build -j$(nproc)",
+                        "cp build/src/bpftrace /usr/bin/",
                         "rm -rf *"
                     ]
                 }
