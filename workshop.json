@@ -179,6 +179,7 @@
                     "libbpf-static",
                     "libzstd-devel",
                     "pahole",
+                    "vim-common",
                     "zlib-devel"
                 ]
             }
