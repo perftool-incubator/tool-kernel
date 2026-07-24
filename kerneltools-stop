@@ -134,11 +134,13 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
             fi
             ;;
         tcp-probe)
-            if [ -e tcp-probe-stdout.txt ]; then
-                echo "Compressing tcp-probe output"
-                ${taskset_cmd} xz --threads=0 tcp-probe-stdout.txt
+            echo "Stopping tcp-probe"
+            if [ -f tcp-probe-data/tcp-probe.out ]; then
+                lines=$(wc -l < tcp-probe-data/tcp-probe.out)
+                echo "Collected $lines lines of bpftrace output"
+                ${taskset_cmd} xz --threads=0 tcp-probe-data/tcp-probe.out
             else
-                echo "Warning: tcp-probe-stdout.txt was not found"
+                echo "Warning: tcp-probe-data/tcp-probe.out was not found"
             fi
             ;;
         trace-cmd)

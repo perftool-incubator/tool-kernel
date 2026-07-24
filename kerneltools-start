@@ -104,12 +104,31 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
             echo "$turbo_pid" >>kerneltools-pids.txt
             ;;
         tcp-probe)
-            echo "Starting tcp-probe (ss polling every ${interval}s)"
-            (while true; do
-                printf "=== %s ===\n" "$(date +%s%3N)"
-                /usr/sbin/ss -t -i -n 2>&1
-                sleep "$interval"
-            done) >>tcp-probe-stdout.txt 2>&1 &
+            echo "Starting tcp-probe (bpftrace tcp:tcp_probe tracepoint)"
+            mkdir -p tcp-probe-data
+
+            # Record boot-to-epoch offset so the post-processor can
+            # convert bpftrace nsecs (nanoseconds since boot) to epoch ms
+            python3 -c "
+import time
+mono = time.monotonic()
+epoch = time.time()
+print('%.6f %.6f' % (mono, epoch))
+" > tcp-probe-data/clock_offset.txt
+            echo "Clock offset: $(cat tcp-probe-data/clock_offset.txt)"
+
+            bt_script="$(dirname $(which kerneltools-start))/../tcp-probe.bt"
+            if [ ! -f "$bt_script" ]; then
+                bt_script="/opt/toolbox/tcp-probe.bt"
+            fi
+            if [ ! -f "$bt_script" ]; then
+                echo "ERROR: tcp-probe.bt not found"
+                touch kerneltools-pids.txt
+                break
+            fi
+            echo "Using bpftrace script: $bt_script"
+
+            nohup bpftrace "$bt_script" > tcp-probe-data/tcp-probe.out 2>tcp-probe-data/tcp-probe.err &
             tcp_probe_pid=$!
             echo "tcp-probe pid is $tcp_probe_pid"
             echo "$tcp_probe_pid" >>kerneltools-pids.txt

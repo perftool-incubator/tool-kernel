@@ -27,13 +27,14 @@ Per-CPU (numeric CPU field):
     c2-pct                utilization  %     {cpu: N}
     ipc                   throughput         {cpu: N}
 
-TCP-probe metrics (from ss -t -i -n polling)
---------------------------------------------
-Per connection (breakout by local port):
-    tcp-cwnd              count        MSS   {local_port: N}
-    tcp-ssthresh          count        MSS   {local_port: N}
-    tcp-rtt-ms            latency      ms    {local_port: N}
-    tcp-bytes-sent        count        B     {local_port: N}
+TCP-probe metrics (from bpftrace tcp:tcp_probe tracepoint)
+----------------------------------------------------------
+Per connection (breakout by src/dst/sport/dport):
+    snd_cwnd              count              {src, dst, sport, dport}
+    ssthresh              count              {src, dst, sport, dport}
+    snd_wnd               count              {src, dst, sport, dport}
+    srtt                  count        us    {src, dst, sport, dport}
+    rcv_wnd               count              {src, dst, sport, dport}
 """
 
 from __future__ import annotations
@@ -128,36 +129,33 @@ def process_turbostat(log_file: str) -> None:
 
 
 # ── TCP-probe ─────────────────────────────────────────────────────────────────
+# Parses bpftrace output from tcp-probe.bt (tcp:tcp_probe tracepoint).
+# Output format: nsecs src_ip sport dst_ip dport snd_cwnd ssthresh snd_wnd srtt rcv_wnd
+# Handles sub-millisecond collisions by averaging within each ms bucket.
 
-# ss -t -i -n produces intervals separated by "=== <epoch_ms> ===" markers.
-# Each connection spans two lines:
-#   tcp  ESTAB  0  0  local_addr:port  peer_addr:port
-#        cubic wscale:... rtt:N.N/N.N ... cwnd:N ssthresh:N bytes_sent:N ...
-_SS_CONN_RE = re.compile(
-    r"^tcp\s+ESTAB\s+\d+\s+\d+\s+(\S+):(\d+)\s+\S+:\d+"
-)
-_SS_STAT_FIELDS = {
-    "cwnd":       ("tcp-cwnd",       "count",   lambda v: float(v)),
-    "ssthresh":   ("tcp-ssthresh",   "count",   lambda v: float(v)),
-    "bytes_sent": ("tcp-bytes-sent", "count",   lambda v: float(v)),
-}
+_TCP_PROBE_METRICS = ["snd_cwnd", "ssthresh", "snd_wnd", "srtt", "rcv_wnd"]
 
 
-def _parse_rtt(stats_line: str) -> float | None:
-    """Extract the mean RTT from 'rtt:N.NNN/N.NNN' (ms)."""
-    m = re.search(r"\brtt:([\d.]+)/[\d.]+", stats_line)
-    return float(m.group(1)) if m else None
-
-
-def _parse_stat(stats_line: str, key: str) -> float | None:
-    m = re.search(r"\b" + re.escape(key) + r":([\d]+)", stats_line)
-    return float(m.group(1)) if m else None
+def _read_clock_offset(data_dir: str) -> float:
+    """Read monotonic-to-epoch offset recorded at collection start."""
+    offset_file = os.path.join(data_dir, "clock_offset.txt")
+    if not os.path.exists(offset_file):
+        print("WARNING: clock_offset.txt not found, timestamps may be wrong")
+        return 0.0
+    with open(offset_file) as f:
+        parts = f.read().strip().split()
+    if len(parts) == 2:
+        mono, epoch = float(parts[0]), float(parts[1])
+        print(f"Clock offset: mono={mono:.3f} epoch={epoch:.3f} offset={epoch-mono:.3f}")
+        return epoch - mono
+    return 0.0
 
 
 def process_tcp_probe(log_file: str) -> None:
     print(f"Post-processing tcp-probe: {log_file}")
     source = "tcp-probe"
-    metrics = CDMMetrics()
+    data_dir = os.path.dirname(log_file) or "."
+    clock_offset = _read_clock_offset(data_dir)
 
     try:
         fh, _ = open_read_text_file(log_file)
@@ -165,53 +163,75 @@ def process_tcp_probe(log_file: str) -> None:
         print(f"ERROR: could not open {log_file}")
         return
 
-    ts_ms: int = 0
-    pending_conn: tuple[str, str] | None = None  # (local_addr, local_port)
+    # First pass: parse bpftrace lines into per-connection, per-ms buckets.
+    # connections[conn_key][ts_ms] = ([sum0, sum1, ...], count)
+    connections: dict = {}
+    line_count = skip_count = 0
 
     for raw_line in fh:
-        line = raw_line.rstrip("\n")
-
-        # Interval separator
-        m = re.match(r"^=== (\d+) ===$", line)
-        if m:
-            ts_ms = int(m.group(1))
-            pending_conn = None
+        parts = raw_line.strip().split()
+        if len(parts) != 10:
+            skip_count += 1
+            continue
+        try:
+            nsecs = int(parts[0])
+            src_ip = parts[1]
+            sport = parts[2]
+            dst_ip = parts[3]
+            dport = parts[4]
+            values = [int(parts[i]) for i in range(5, 10)]
+        except (ValueError, IndexError):
+            skip_count += 1
             continue
 
-        if not ts_ms:
-            continue
+        # bpftrace nsecs is nanoseconds since boot; convert to epoch ms
+        ts_ms = int((nsecs / 1e9 + clock_offset) * 1000)
+        conn_key = (src_ip, sport, dst_ip, dport)
 
-        # Connection summary line
-        m = _SS_CONN_RE.match(line)
-        if m:
-            pending_conn = (m.group(1), m.group(2))
-            continue
-
-        # Socket internals line (indented)
-        if pending_conn and line.startswith(" ") and line.strip():
-            local_port = pending_conn[1]
-            names = {"local_port": local_port}
-            sample_base = {"end": ts_ms}
-
-            for key, (metric_type, cdm_class, cast) in _SS_STAT_FIELDS.items():
-                val = _parse_stat(line, key)
-                if val is not None:
-                    desc = {"source": source, "class": cdm_class, "type": metric_type}
-                    metrics.log_sample(source, desc, names, {**sample_base, "value": cast(val)})
-
-            rtt = _parse_rtt(line)
-            if rtt is not None:
-                desc = {"source": source, "class": "latency", "type": "tcp-rtt-ms"}
-                metrics.log_sample(source, desc, names, {**sample_base, "value": rtt})
-
-            pending_conn = None
-            continue
-
-        pending_conn = None
+        if conn_key not in connections:
+            connections[conn_key] = {}
+        bucket = connections[conn_key]
+        if ts_ms in bucket:
+            sums, cnt = bucket[ts_ms]
+            for i in range(5):
+                sums[i] += values[i]
+            bucket[ts_ms] = (sums, cnt + 1)
+        else:
+            bucket[ts_ms] = ([float(v) for v in values], 1)
+        line_count += 1
 
     fh.close()
+
+    # Second pass: emit CDM samples.
+    metrics = CDMMetrics()
+    idx_cache: dict = {}
+    sample_count = collapsed = 0
+
+    for conn_key, ts_data in connections.items():
+        src_ip, sport, dst_ip, dport = conn_key
+        names = {"src": src_ip, "dst": dst_ip, "sport": sport, "dport": dport}
+
+        for ts_ms in sorted(ts_data):
+            sums, cnt = ts_data[ts_ms]
+            if cnt > 1:
+                collapsed += cnt - 1
+            avgs = [s / cnt for s in sums]
+
+            for i, metric_name in enumerate(_TCP_PROBE_METRICS):
+                cache_key = (metric_name, conn_key)
+                if cache_key in idx_cache:
+                    metrics.log_sample_by_idx(idx_cache[cache_key], avgs[i], ts_ms)
+                else:
+                    desc = {"class": "count", "source": source, "type": metric_name}
+                    sample = {"value": avgs[i], "end": ts_ms}
+                    idx = metrics.log_sample(source, desc, names, sample)
+                    if idx is not None:
+                        idx_cache[cache_key] = idx
+            sample_count += 1
+
     metrics.finish_samples()
-    print("Post-processing for tcp-probe complete")
+    print(f"tcp-probe: {line_count} events → {sample_count} ms samples "
+          f"({collapsed} sub-ms averaged, {skip_count} skipped)")
 
 
 # ── Shared helpers ────────────────────────────────────────────────────────────
@@ -234,17 +254,20 @@ def main() -> None:
     files = sorted(os.listdir("."))
     print(f"files to process:\n {' '.join(files)}")
 
-    dispatch = [
-        (r"^turbostat-stdout\.txt(\.xz)?$", process_turbostat),
-        (r"^tcp-probe-stdout\.txt(\.xz)?$", process_tcp_probe),
-    ]
+    # turbostat: top-level file
+    turbostat_files = [f for f in files if re.match(r"^turbostat-stdout\.txt(\.xz)?$", f)]
+    if len(turbostat_files) > 1:
+        print(f"ERROR: multiple turbostat files: {turbostat_files}")
+    elif turbostat_files:
+        process_turbostat(turbostat_files[0])
 
-    for pattern, handler in dispatch:
-        matches = [f for f in files if re.match(pattern, f)]
-        if len(matches) > 1:
-            print(f"ERROR: multiple files match {pattern}: {matches}")
-        elif matches:
-            handler(matches[0])
+    # tcp-probe: bpftrace output in tcp-probe-data/ subdirectory
+    tcp_probe_out = "tcp-probe-data/tcp-probe.out"
+    tcp_probe_xz = tcp_probe_out + ".xz"
+    if os.path.exists(tcp_probe_xz):
+        process_tcp_probe(tcp_probe_xz)
+    elif os.path.exists(tcp_probe_out):
+        process_tcp_probe(tcp_probe_out)
 
     print("kerneltools post-processing complete")
 

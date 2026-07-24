@@ -1,0 +1,14 @@
+#include <linux/in6.h>
+
+tracepoint:tcp:tcp_probe
+{
+    
+    printf("%lld %d.%d.%d.%d %d %d.%d.%d.%d %d %u %u %u %u %u\n",
+        nsecs,
+        args->saddr[4], args->saddr[5], args->saddr[6], args->saddr[7],
+        args->sport,
+        args->daddr[4], args->daddr[5], args->daddr[6], args->daddr[7],
+        args->dport,
+        args->snd_cwnd, args->ssthresh, args->snd_wnd, args->srtt,
+        args->rcv_wnd);
+}
