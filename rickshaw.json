@@ -42,5 +42,8 @@
         ],
         "start": "kerneltools-start",
         "stop": "kerneltools-stop"
-      }
+    },
+    "controller": {
+        "post-script": "%tool-dir%kerneltools-post-process.py"
+    }
 }
