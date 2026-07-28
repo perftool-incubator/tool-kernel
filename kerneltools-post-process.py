@@ -23,9 +23,10 @@ turbostat — per-CPU (numeric CPU field):
     turbostat:ipc                   throughput         {cpu: N}
 
 perf-stat — per-CPU (from `perf stat -a -A -I N -x , -e cycles,instructions,...`):
-    perf-stat:ipc                   throughput         {cpu: N}
-    perf-stat:cache-miss-rate       utilization  %     {cpu: N}
-    perf-stat:llc-load-miss-rate    utilization  %     {cpu: N}
+    perf-stat:ipc                       throughput         {cpu: N}
+    perf-stat:cache-miss-rate           utilization  %     {cpu: N}
+    perf-stat:backend-stall-rate        utilization  %     {cpu: N}
+    perf-stat:frontend-stall-rate       utilization  %     {cpu: N}
 """
 
 from __future__ import annotations
@@ -193,12 +194,12 @@ def process_perf_stat(log_file: str) -> None:
     metrics = CDMMetrics()
 
     for (ts_ms, cpu), evts in sorted(intervals.items()):
-        cycles       = evts.get("cycles", 0)
-        instructions = evts.get("instructions", 0)
-        cache_miss   = evts.get("cache-misses", None)
-        cache_ref    = evts.get("cache-references", None)
-        llc_miss     = evts.get("LLC-load-misses", None)
-        llc_load     = evts.get("LLC-loads", None)
+        cycles          = evts.get("cycles", 0)
+        instructions    = evts.get("instructions", 0)
+        cache_miss      = evts.get("cache-misses", None)
+        cache_ref       = evts.get("cache-references", None)
+        stall_backend   = evts.get("stalled-cycles-backend", None)
+        stall_frontend  = evts.get("stalled-cycles-frontend", None)
 
         # Strip "CPU" prefix for the breakout name
         cpu_num = cpu.replace("CPU", "") if cpu.startswith("CPU") else cpu
@@ -223,11 +224,20 @@ def process_perf_stat(log_file: str) -> None:
                 {**sample_base, "value": rate},
             )
 
-        if llc_miss is not None and llc_load is not None and llc_load > 0:
-            rate = llc_miss / llc_load * 100.0
+        if stall_backend is not None and cycles > 0:
+            rate = stall_backend / cycles * 100.0
             metrics.log_sample(
                 SOURCE_PERF_STAT,
-                {"source": SOURCE_PERF_STAT, "class": "utilization", "type": "llc-load-miss-rate"},
+                {"source": SOURCE_PERF_STAT, "class": "utilization", "type": "backend-stall-rate"},
+                names,
+                {**sample_base, "value": rate},
+            )
+
+        if stall_frontend is not None and cycles > 0:
+            rate = stall_frontend / cycles * 100.0
+            metrics.log_sample(
+                SOURCE_PERF_STAT,
+                {"source": SOURCE_PERF_STAT, "class": "utilization", "type": "frontend-stall-rate"},
                 names,
                 {**sample_base, "value": rate},
             )
