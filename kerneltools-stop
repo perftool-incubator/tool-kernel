@@ -133,6 +133,14 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
                 echo "Warning: turbostat-stdout.txt was not found"
             fi
             ;;
+        toplev)
+            if [ -e toplev-stdout.txt ]; then
+                echo "Compressing toplev output"
+                ${taskset_cmd} xz --threads=0 toplev-stdout.txt
+            else
+                echo "Warning: toplev-stdout.txt was not found"
+            fi
+            ;;
         perf-stat)
             if [ -e perf-stat-stdout.txt ]; then
                 echo "Compressing perf-stat output"

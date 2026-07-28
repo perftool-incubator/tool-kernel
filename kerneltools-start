@@ -18,7 +18,7 @@ echo "mount:"
 mount
 echo
 # defaults
-subtools="turbostat" # subtools that will be used, any combination of: turbostat,perf,perf-stat,speed-select-util,trace-cmd,sysfs-trace <no-spaces>
+subtools="turbostat" # subtools that will be used, any combination of: turbostat,perf,perf-stat,toplev,speed-select-util,trace-cmd,sysfs-trace <no-spaces>
 interval=10
 record_opts=""
 base_freq=""
@@ -102,6 +102,20 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
             turbo_pid=$!
             echo "turbostat pid is $turbo_pid"
             echo "$turbo_pid" >>kerneltools-pids.txt
+            ;;
+        toplev)
+            echo "Starting toplev (Top-Down Methodology analysis at ${interval}s intervals)"
+            # debugfs required for PMU event access
+            grep -q debugfs /proc/mounts || mount -t debugfs none /sys/kernel/debug 2>/dev/null || true
+            # toplev.py -l3: three-level Top-Down breakdown (Frontend/Backend-Memory/Backend-Core)
+            # -I <ms>: report every N milliseconds  -x ,: CSV output for parsing
+            # -a: system-wide  --no-multiplex: avoid multiplexing errors on busy systems
+            python3 /usr/local/share/pmu-tools/toplev.py \
+                -l3 -I "$((interval * 1000))" -x , -a --no-multiplex \
+                > toplev-stdout.txt 2>&1 &
+            toplev_pid=$!
+            echo "toplev pid is $toplev_pid"
+            echo "$toplev_pid" >>kerneltools-pids.txt
             ;;
         perf-stat)
             echo "Starting perf-stat (per-CPU IPC at ${interval}s intervals)"

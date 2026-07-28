@@ -6,7 +6,7 @@
 
 Runs in the kernel tool's data directory (one per profiler instance).
 Dispatches to per-subtool handlers based on which output files exist.
-Currently handles: turbostat, perf-stat.
+Currently handles: turbostat, perf-stat, toplev.
 
 Metrics emitted
 ---------------
@@ -26,6 +26,14 @@ perf-stat — per-CPU (from `perf stat -a -A -I N -x , -e cycles,instructions,..
     perf-stat:ipc                   throughput         {cpu: N}
     perf-stat:cache-miss-rate       utilization  %     {cpu: N}
     perf-stat:llc-load-miss-rate    utilization  %     {cpu: N}
+
+toplev — system-wide Top-Down Methodology (from `toplev.py -l3 -I N -x ,`):
+    toplev:frontend-bound           utilization  %
+    toplev:backend-bound            utilization  %
+    toplev:memory-bound             utilization  %
+    toplev:core-bound               utilization  %
+    toplev:bad-speculation          utilization  %
+    toplev:retiring                 utilization  %
 """
 
 from __future__ import annotations
@@ -133,6 +141,17 @@ def process_turbostat(log_file: str) -> None:
 
 
 SOURCE_PERF_STAT = "perf-stat"
+SOURCE_TOPLEV = "toplev"
+
+# Mapping from toplev metric path fragments to CDM type names
+_TOPLEV_METRIC_MAP = {
+    "Frontend_Bound":              "frontend-bound",
+    "Backend_Bound.Memory_Bound":  "memory-bound",
+    "Backend_Bound.Core_Bound":    "core-bound",
+    "Backend_Bound":               "backend-bound",
+    "Bad_Speculation":             "bad-speculation",
+    "Retiring":                    "retiring",
+}
 
 
 def process_perf_stat(log_file: str) -> None:
@@ -236,6 +255,71 @@ def process_perf_stat(log_file: str) -> None:
     print("Post-processing for perf-stat complete")
 
 
+def process_toplev(log_file: str) -> None:
+    """Parse `toplev.py -l3 -I N -x ,` CSV output and emit CDM metrics.
+
+    toplev CSV columns:
+      timestamp, cpu, area, metric, value, unit, [description, ...]
+
+    With -x , and no --cpu flag, cpu field is empty (system-wide).
+    We emit each recognised Top-Down metric as a CDM utilization % sample.
+    """
+    print(f"Post-processing toplev: {log_file}")
+
+    try:
+        fh, _ = open_read_text_file(log_file)
+    except FileNotFoundError:
+        print(f"ERROR: could not open {log_file}")
+        return
+
+    metrics = CDMMetrics()
+    found = 0
+
+    for raw_line in fh:
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split(",")
+        if len(parts) < 5:
+            continue
+        try:
+            ts_s   = float(parts[0])
+            metric = parts[3].strip()
+            val_s  = parts[4].strip()
+        except (ValueError, IndexError):
+            continue
+
+        if val_s in ("", "N/A", "nan"):
+            continue
+        try:
+            value = float(val_s)
+        except ValueError:
+            continue
+
+        # Match metric to a known CDM type
+        cdm_type = None
+        for key, name in _TOPLEV_METRIC_MAP.items():
+            if key in metric:
+                cdm_type = name
+                break
+        if cdm_type is None:
+            continue
+
+        ts_ms = int(round(ts_s * 1000))
+        desc = {"source": SOURCE_TOPLEV, "class": "utilization", "type": cdm_type}
+        metrics.log_sample(SOURCE_TOPLEV, desc, {}, {"end": ts_ms, "value": value})
+        found += 1
+
+    fh.close()
+
+    if found == 0:
+        print("WARNING: no toplev metric data found")
+        return
+
+    metrics.finish_samples()
+    print(f"Post-processing for toplev complete ({found} data points)")
+
+
 def main() -> None:
     print("kerneltools-post-process")
 
@@ -263,6 +347,16 @@ def main() -> None:
         print(f"ERROR: multiple perf-stat files found: {perf_stat_files}")
     elif perf_stat_files:
         process_perf_stat(perf_stat_files[0])
+
+    toplev_files = [
+        f for f in files
+        if re.match(r"^toplev-stdout\.txt(\.xz)?$", f)
+    ]
+
+    if len(toplev_files) > 1:
+        print(f"ERROR: multiple toplev files found: {toplev_files}")
+    elif toplev_files:
+        process_toplev(toplev_files[0])
 
     print("kerneltools post-processing complete")
 

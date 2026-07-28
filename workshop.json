@@ -8,7 +8,8 @@
         {
             "name": "default",
             "requirements": [
-		"packages"
+		"packages",
+		"pmu_tools"
             ]
         }
     ],
@@ -159,6 +160,15 @@
                         "rm -rf *"
                     ]
                 }
+            }
+        },
+        {
+            "name": "pmu_tools",
+            "type": "manual",
+            "manual_info": {
+                "commands": [
+                    "git clone https://github.com/andikleen/pmu-tools.git /usr/local/share/pmu-tools"
+                ]
             }
         },
         {
