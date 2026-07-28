@@ -123,9 +123,13 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
             grep -q debugfs /proc/mounts || mount -t debugfs none /sys/kernel/debug 2>/dev/null || true
             # -a: system-wide  -A: per-CPU (no aggregation)  -I: interval in ms
             # -x,: CSV output for easier parsing
-            # Events: cycles, instructions (IPC), cache-misses, LLC-load-misses (cache pressure)
+            # Events (work on both Intel and AMD via generic hw aliases):
+            #   cycles, instructions            → IPC
+            #   cache-misses                    → L2/L3 cache misses
+            #   stalled-cycles-backend          → backend stall % (memory, TLB, exec units)
+            #   stalled-cycles-frontend         → frontend stall % (fetch, decode)
             /usr/bin/perf stat -a -A -I "$((interval * 1000))" -x , \
-                -e cycles,instructions,cache-misses,LLC-load-misses \
+                -e cycles,instructions,cache-misses,stalled-cycles-backend,stalled-cycles-frontend \
                 > perf-stat-stdout.txt 2>&1 &
             perf_stat_pid=$!
             echo "perf-stat pid is $perf_stat_pid"
