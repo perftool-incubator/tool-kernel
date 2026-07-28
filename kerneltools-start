@@ -18,7 +18,7 @@ echo "mount:"
 mount
 echo
 # defaults
-subtools="turbostat" # subtools that will be used, any combination of: turbostat,perf,speed-select-util,trace-cmd,sysfs-trace <no-spaces>
+subtools="turbostat" # subtools that will be used, any combination of: turbostat,perf,perf-stat,speed-select-util,trace-cmd,sysfs-trace <no-spaces>
 interval=10
 record_opts=""
 base_freq=""
@@ -102,6 +102,20 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
             turbo_pid=$!
             echo "turbostat pid is $turbo_pid"
             echo "$turbo_pid" >>kerneltools-pids.txt
+            ;;
+        perf-stat)
+            echo "Starting perf-stat (per-CPU IPC at ${interval}s intervals)"
+            # debugfs required for some PMU event access
+            grep -q debugfs /proc/mounts || mount -t debugfs none /sys/kernel/debug 2>/dev/null || true
+            # -a: system-wide  -A: per-CPU (no aggregation)  -I: interval in ms
+            # -x,: CSV output for easier parsing
+            # Events: cycles, instructions (IPC), cache-misses, LLC-load-misses (cache pressure)
+            /usr/bin/perf stat -a -A -I "$((interval * 1000))" -x , \
+                -e cycles,instructions,cache-misses,LLC-load-misses \
+                > perf-stat-stdout.txt 2>&1 &
+            perf_stat_pid=$!
+            echo "perf-stat pid is $perf_stat_pid"
+            echo "$perf_stat_pid" >>kerneltools-pids.txt
             ;;
         intel-speed-select)
             echo "invoking intel-speed-select"
