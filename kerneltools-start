@@ -18,7 +18,7 @@ echo "mount:"
 mount
 echo
 # defaults
-subtools="turbostat" # subtools that will be used, any combination of: turbostat,perf,perf-stat,toplev,speed-select-util,trace-cmd,sysfs-trace <no-spaces>
+subtools="turbostat" # subtools that will be used, any combination of: turbostat,perf,hw-counters,perf-stat,toplev,speed-select-util,trace-cmd,sysfs-trace <no-spaces>
 interval=10
 record_opts=""
 base_freq=""
@@ -81,6 +81,14 @@ while true; do
     esac
 done
 
+# Record system boot time in seconds since epoch
+boot_time=$(date -u --date="$(TZ=UTC uptime -s)" +%s)
+echo "System boot time since epoch: $boot_time"
+echo "$boot_time" > kerneltools-boot-time.txt
+
+# Record configured interval size
+echo "$interval" > kerneltools-interval.txt
+
 /bin/rm -f kerneltools-pids.txt
 for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
     case "$subtool" in
@@ -116,6 +124,13 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
             toplev_pid=$!
             echo "toplev pid is $toplev_pid"
             echo "$toplev_pid" >>kerneltools-pids.txt
+            ;;
+        hw-counters)
+            echo "Starting hw-counters (direct PMU counter reads via python)"
+            python3 kerneltools-hw-counters.py "$interval" hw-counters-stdout.txt > hw-counters-stderr.txt 2>&1 &
+            hw_counters_pid=$!
+            echo "hw-counters pid is $hw_counters_pid"
+            echo "$hw_counters_pid" >>kerneltools-pids.txt
             ;;
         perf-stat)
             echo "Starting perf-stat (per-CPU IPC at ${interval}s intervals)"

@@ -42,6 +42,7 @@ from __future__ import annotations
 import os
 import re
 import sys
+import time
 from pathlib import Path
 
 TOOLBOX_HOME = os.environ.get("TOOLBOX_HOME")
@@ -155,6 +156,77 @@ _TOPLEV_METRIC_MAP = {
 }
 
 
+def get_turbostat_start_time() -> float | None:
+    try:
+        files = sorted(os.listdir("."))
+        turbostat_files = [
+            f for f in files
+            if re.match(r"^turbostat-stdout\.txt(\.xz)?$", f)
+        ]
+        if not turbostat_files:
+            return None
+        fh, _ = open_read_text_file(turbostat_files[0])
+        col_idx: dict[str, int] = {}
+        for raw_line in fh:
+            line = raw_line.rstrip("\n")
+            if line.startswith("usec\t"):
+                cols = line.split("\t")
+                col_idx = {c: i for i, c in enumerate(cols)}
+                continue
+            if not col_idx or not line:
+                continue
+            c = line[0]
+            if not (c.isdigit() or c == " "):
+                continue
+            fields = line.split("\t")
+            val = _safe_float(fields, col_idx, "Time_Of_Day_Seconds")
+            if val is not None:
+                fh.close()
+                return val
+        fh.close()
+    except Exception:
+        pass
+    return None
+
+
+def get_boot_time(perf_first_ts: float = 0.0) -> float:
+    """Determine the system boot time in seconds since Unix epoch."""
+    # Method 1: Read from kerneltools-boot-time.txt if available
+    try:
+        if os.path.exists("kerneltools-boot-time.txt"):
+            with open("kerneltools-boot-time.txt", "r") as f:
+                val = f.read().strip()
+                if val:
+                    return float(val)
+    except Exception:
+        pass
+
+    # Method 2: Align with turbostat's Time_Of_Day_Seconds if available
+    if perf_first_ts > 0:
+        turbostat_start = get_turbostat_start_time()
+        if turbostat_start is not None:
+            # Calculate boot time by subtracting the first perf monotonic timestamp
+            # from the first turbostat epoch timestamp
+            return turbostat_start - perf_first_ts
+
+    # Method 3: Read /proc/stat btime
+    try:
+        with open("/proc/stat", "r") as f:
+            for line in f:
+                if line.startswith("btime "):
+                    return float(line.split()[1])
+    except Exception:
+        pass
+
+    # Method 4: Fallback using python time and monotonic clocks
+    try:
+        return time.time() - time.monotonic()
+    except Exception:
+        pass
+
+    return 0.0
+
+
 def process_perf_stat(log_file: str) -> None:
     """Parse `perf stat -a -A -I N -x ,` CSV output and emit CDM metrics.
 
@@ -175,6 +247,7 @@ def process_perf_stat(log_file: str) -> None:
     # Accumulate per-interval per-CPU event counts.
     # key: (timestamp_ms, cpu) -> {event: count}
     intervals: dict[tuple[int, str], dict[str, float]] = {}
+    boot_time = None
 
     for raw_line in fh:
         line = raw_line.strip()
@@ -200,7 +273,10 @@ def process_perf_stat(log_file: str) -> None:
 
         # Normalise event name (strip qualifiers like ":u")
         event = event.split(":")[0]
-        ts_ms = int(round(ts_s * 1000))
+        if boot_time is None:
+            boot_time = get_boot_time(ts_s)
+        ts_epoch_s = ts_s + boot_time
+        ts_ms = int(round(ts_epoch_s * 1000))
         key = (ts_ms, cpu)
         intervals.setdefault(key, {})[event] = count
 
@@ -265,6 +341,88 @@ def process_perf_stat(log_file: str) -> None:
     print("Post-processing for perf-stat complete")
 
 
+def process_hw_counters(log_file: str) -> None:
+    """Parse `hw-counters-stdout.txt` CSV output and emit CDM metrics."""
+    print(f"Post-processing hw-counters: {log_file}")
+
+    try:
+        fh, _ = open_read_text_file(log_file)
+    except FileNotFoundError:
+        print(f"ERROR: could not open {log_file}")
+        return
+
+    metrics = CDMMetrics()
+    found = 0
+
+    for raw_line in fh:
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split(",")
+        if len(parts) < 7:
+            continue
+        try:
+            ts_ms = int(parts[0])
+            cpu = parts[1].strip()
+            cycles = float(parts[2])
+            instructions = float(parts[3])
+            cache_misses = float(parts[4])
+            stall_backend = float(parts[5])
+            stall_frontend = float(parts[6])
+        except (ValueError, IndexError):
+            continue
+
+        # Strip "CPU" prefix for breakout name
+        cpu_num = cpu.replace("CPU", "") if cpu.startswith("CPU") else cpu
+        names = {"cpu": cpu_num}
+        sample_base = {"end": ts_ms}
+
+        if cycles > 0 and instructions > 0:
+            ipc = instructions / cycles
+            metrics.log_sample(
+                SOURCE_PERF_STAT,
+                {"source": SOURCE_PERF_STAT, "class": "throughput", "type": "ipc"},
+                names,
+                {**sample_base, "value": ipc},
+            )
+
+        if cycles > 0:
+            rate = cache_misses / cycles * 100.0
+            metrics.log_sample(
+                SOURCE_PERF_STAT,
+                {"source": SOURCE_PERF_STAT, "class": "utilization", "type": "cache-miss-rate"},
+                names,
+                {**sample_base, "value": rate},
+            )
+
+            rate = stall_backend / cycles * 100.0
+            metrics.log_sample(
+                SOURCE_PERF_STAT,
+                {"source": SOURCE_PERF_STAT, "class": "utilization", "type": "stall-backend-rate"},
+                names,
+                {**sample_base, "value": rate},
+            )
+
+            rate = stall_frontend / cycles * 100.0
+            metrics.log_sample(
+                SOURCE_PERF_STAT,
+                {"source": SOURCE_PERF_STAT, "class": "utilization", "type": "stall-frontend-rate"},
+                names,
+                {**sample_base, "value": rate},
+            )
+
+        found += 1
+
+    fh.close()
+
+    if found == 0:
+        print("WARNING: no hw-counters metric data found")
+        return
+
+    metrics.finish_samples()
+    print(f"Post-processing for hw-counters complete ({found} data points)")
+
+
 def process_toplev(log_file: str) -> None:
     """Parse `toplev.py -l3 -I N -x ,` CSV output and emit CDM metrics.
 
@@ -284,6 +442,7 @@ def process_toplev(log_file: str) -> None:
 
     metrics = CDMMetrics()
     found = 0
+    boot_time = None
 
     for raw_line in fh:
         line = raw_line.strip()
@@ -315,7 +474,10 @@ def process_toplev(log_file: str) -> None:
         if cdm_type is None:
             continue
 
-        ts_ms = int(round(ts_s * 1000))
+        if boot_time is None:
+            boot_time = get_boot_time(ts_s)
+        ts_epoch_s = ts_s + boot_time
+        ts_ms = int(round(ts_epoch_s * 1000))
         desc = {"source": SOURCE_TOPLEV, "class": "utilization", "type": cdm_type}
         metrics.log_sample(SOURCE_TOPLEV, desc, {}, {"end": ts_ms, "value": value})
         found += 1
@@ -357,6 +519,16 @@ def main() -> None:
         print(f"ERROR: multiple perf-stat files found: {perf_stat_files}")
     elif perf_stat_files:
         process_perf_stat(perf_stat_files[0])
+
+    hw_counters_files = [
+        f for f in files
+        if re.match(r"^hw-counters-stdout\.txt(\.xz)?$", f)
+    ]
+
+    if len(hw_counters_files) > 1:
+        print(f"ERROR: multiple hw-counters files found: {hw_counters_files}")
+    elif hw_counters_files:
+        process_hw_counters(hw_counters_files[0])
 
     toplev_files = [
         f for f in files
