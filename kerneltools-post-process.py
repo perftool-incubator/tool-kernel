@@ -2,27 +2,6 @@
 # -*- mode: python; indent-tabs-mode: nil; python-indent-level: 4 -*-
 # vim: autoindent tabstop=4 shiftwidth=4 expandtab softtabstop=4 filetype=python
 
-"""Post-process kernel tool output and emit CDM metrics.
-
-Runs in the kernel tool's data directory (one per profiler instance).
-Dispatches to per-subtool handlers based on which output files exist.
-Currently handles: turbostat.
-
-Metrics emitted
----------------
-System aggregate (all topology fields = "-"):
-    turbostat:cpu-busy-pct          utilization  %
-    turbostat:cpu-freq-avg-mhz      throughput   MHz
-    turbostat:package-power-watt    throughput   W
-
-Per-CPU (numeric CPU field):
-    turbostat:cpu-busy-pct          utilization  %     {cpu: N}
-    turbostat:cpu-busy-freq-mhz     throughput   MHz   {cpu: N}
-    turbostat:c1-pct                utilization  %     {cpu: N}
-    turbostat:c2-pct                utilization  %     {cpu: N}
-    turbostat:ipc                   throughput         {cpu: N}
-"""
-
 from __future__ import annotations
 
 import os
@@ -93,14 +72,16 @@ def process_turbostat(log_file: str) -> None:
 
         if package == "-":
             # System aggregate row
-            for metric_type, cdm_class, col in (
-                ("cpu-busy-pct",       "utilization", "Busy%"),
-                ("cpu-freq-avg-mhz",   "throughput",  "Avg_MHz"),
-                ("package-power-watt", "throughput",  "PkgWatt"),
+            for metric_type, cdm_class, default_agg, col in (
+                ("cpu-busy-pct",       "percentage",  "avg", "Busy%"),
+                ("cpu-freq-avg-mhz",   "throughput",  "avg", "Avg_MHz"),
+                ("package-power-watt", "throughput",  "sum", "PkgWatt"),
             ):
                 val = _safe_float(fields, col_idx, col)
                 if val is not None:
-                    desc = {"source": SOURCE, "class": cdm_class, "type": metric_type}
+                    if cdm_class == "percentage":
+                        val /= 100
+                    desc = {"source": SOURCE, "class": cdm_class, "type": metric_type, "default-aggregation": default_agg}
                     metrics.log_sample(SOURCE, desc, {}, {**sample_base, "value": val})
 
         elif cpu_field not in ("-", ""):
@@ -110,16 +91,18 @@ def process_turbostat(log_file: str) -> None:
             except ValueError:
                 continue
             names = {"cpu": cpu_num}
-            for metric_type, cdm_class, col in (
-                ("cpu-busy-pct",      "utilization", "Busy%"),
-                ("cpu-busy-freq-mhz", "throughput",  "Bzy_MHz"),
-                ("c1-pct",            "utilization", "C1%"),
-                ("c2-pct",            "utilization", "C2%"),
-                ("ipc",               "throughput",  "IPC"),
+            for metric_type, cdm_class, default_agg, col in (
+                ("cpu-busy-pct",      "percentage",  "avg", "Busy%"),
+                ("cpu-busy-freq-mhz", "throughput",  "avg", "Bzy_MHz"),
+                ("c1-pct",            "percentage",  "avg", "C1%"),
+                ("c2-pct",            "percentage",  "avg", "C2%"),
+                ("ipc",               "throughput",  "avg", "IPC"),
             ):
                 val = _safe_float(fields, col_idx, col)
                 if val is not None:
-                    desc = {"source": SOURCE, "class": cdm_class, "type": metric_type}
+                    if cdm_class == "percentage":
+                        val /= 100
+                    desc = {"source": SOURCE, "class": cdm_class, "type": metric_type, "default-aggregation": default_agg}
                     metrics.log_sample(SOURCE, desc, names, {**sample_base, "value": val})
 
     fh.close()
