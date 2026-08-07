@@ -32,6 +32,7 @@ def _safe_float(fields: list[str], col_idx: dict[str, int], name: str) -> float 
 def process_turbostat(log_file: str) -> None:
     print(f"Post-processing turbostat: {log_file}")
     metrics = CDMMetrics()
+    metric_idx_cache: dict[tuple, int] = {}
 
     try:
         fh, _ = open_read_text_file(log_file)
@@ -81,8 +82,13 @@ def process_turbostat(log_file: str) -> None:
                 if val is not None:
                     if cdm_class == "percentage":
                         val /= 100
-                    desc = {"source": SOURCE, "class": cdm_class, "type": metric_type, "default-aggregation": default_agg}
-                    metrics.log_sample(SOURCE, desc, {}, {**sample_base, "value": val})
+                    cache_key = ("system", metric_type)
+                    if cache_key in metric_idx_cache:
+                        metrics.log_sample_by_idx(metric_idx_cache[cache_key], val, ts_ms)
+                    else:
+                        desc = {"source": SOURCE, "class": cdm_class, "type": metric_type, "default-aggregation": default_agg}
+                        idx = metrics.log_sample(SOURCE, desc, {}, {**sample_base, "value": val})
+                        metric_idx_cache[cache_key] = idx
 
         elif cpu_field not in ("-", ""):
             # Per-CPU row
@@ -102,8 +108,13 @@ def process_turbostat(log_file: str) -> None:
                 if val is not None:
                     if cdm_class == "percentage":
                         val /= 100
-                    desc = {"source": SOURCE, "class": cdm_class, "type": metric_type, "default-aggregation": default_agg}
-                    metrics.log_sample(SOURCE, desc, names, {**sample_base, "value": val})
+                    cache_key = ("cpu", cpu_num, metric_type)
+                    if cache_key in metric_idx_cache:
+                        metrics.log_sample_by_idx(metric_idx_cache[cache_key], val, ts_ms)
+                    else:
+                        desc = {"source": SOURCE, "class": cdm_class, "type": metric_type, "default-aggregation": default_agg}
+                        idx = metrics.log_sample(SOURCE, desc, names, {**sample_base, "value": val})
+                        metric_idx_cache[cache_key] = idx
 
     fh.close()
     metrics.finish_samples()
