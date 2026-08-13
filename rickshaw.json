@@ -41,7 +41,10 @@
             }
         ],
         "start": "kerneltools-start",
-        "stop": "kerneltools-stop"
+        "stop": "kerneltools-stop",
+        "param_regex": [ "s/('--[^']+') 'ON'/$1/g",
+                          "s/'--[^']+' 'OFF'\\s?//g"
+                        ]
     },
     "controller": {
         "post-script": "%tool-dir%kerneltools-post-process.py"

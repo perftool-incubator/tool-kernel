@@ -29,7 +29,7 @@ The start script accepts these parameters:
 - `--sysfs-trace-cleanup <cmd>` — Cleanup commands for sysfs-trace (repeatable)
 
 The stop script additionally accepts:
-- `--perf-gen-local-report` — Generate a local `perf-report.txt` alongside the archived `perf.data` (a no-argument flag at the script level -- passing it at all triggers report generation, regardless of any value supplied)
+- `--perf-gen-local-report <ON|OFF>` — Generate a local `perf-report.txt` alongside the archived `perf.data` (default: `OFF`). `kerneltools-stop` itself takes this as a no-argument flag; `rickshaw.json`'s `param_regex` rewrites `ON` to the bare flag and drops `OFF` (and its value) entirely before the script ever sees it -- mirroring the same ON/OFF-fixup convention used by bench-trafficgen for its own no-argument flags.
 - `--sysfs-trace-collection <system|per-cpu>` — Trace buffer collection mode (default: `per-cpu`)
 
 ## Integration

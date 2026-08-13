@@ -18,7 +18,7 @@
         },
         "enable_disable" : {
             "description" : "enable or disable",
-            "args" : [ "base-freq", "turbo-freq", "core-power", "perf-gen-local-report" ],
+            "args" : [ "base-freq", "turbo-freq", "core-power" ],
             "vals": "^(enable|disable)$"
         },
         "generic_string" : {
@@ -30,6 +30,11 @@
             "description" : "trace buffer collection mode",
             "args" : [ "sysfs-trace-collection" ],
             "vals": "^(system|per-cpu)$"
+        },
+        "on_off" : {
+            "description" : "parameters that should be set to ON or OFF -- handled by rickshaw.json param regex, since kerneltools-stop takes these as no-argument flags rather than a real value",
+            "args" : [ "perf-gen-local-report" ],
+            "vals": "^(ON|OFF)$"
         }
     }
 }
