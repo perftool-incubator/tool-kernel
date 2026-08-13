@@ -16,6 +16,8 @@ Wrapper scripts for Linux kernel profiling tools (perf, turbostat, intel-speed-s
 | `boot_to_epoch.py` | Converts between boot time and Unix epoch for perf time filtering |
 | `rickshaw.json` | Rickshaw integration: endpoint allow/block lists, file deployment, post-process script |
 | `workshop.json` | Engine image build: distro packages and kernel source compilation for perf/turbostat |
+| `tool-metadata.json` | Machine-readable description, subtool list, and CDM-indexed status (consumed by `crucible tools list`) |
+| `multiplex.json` | Parameter validation rules and `defaults` preset for multiplex (mirrors benchmark `multiplex.json`) |
 
 ## Configuration
 - `--subtools <list>` — Comma-separated subtools (default: `turbostat`)

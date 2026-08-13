@@ -1,0 +1,30 @@
+{
+    "presets": {
+        "defaults" : [
+            { "arg": "subtools", "vals": ["turbostat"] },
+            { "arg": "interval", "vals": ["10"] }
+        ]
+    },
+    "validations": {
+        "subtool_list" : {
+            "description" : "comma-separated list of kernel subtools to run, any combination of turbostat/perf/intel-speed-select/trace-cmd/sysfs-trace",
+            "args" : [ "subtools" ],
+            "vals": "^(turbostat|perf|intel-speed-select|trace-cmd|sysfs-trace)(,(turbostat|perf|intel-speed-select|trace-cmd|sysfs-trace))*$"
+        },
+        "positive_integer" : {
+            "description" : "a whole number greater than 0",
+            "args" : [ "interval" ],
+            "vals": "^[1-9][0-9]*$"
+        },
+        "enable_disable" : {
+            "description" : "enable or disable",
+            "args" : [ "base-freq", "turbo-freq", "core-power" ],
+            "vals": "^(enable|disable)$"
+        },
+        "generic_string" : {
+            "description" : "all types of strings",
+            "args" : [ "record-opts", "trace-cmd-record-opts", "sysfs-trace-setup", "sysfs-trace-cleanup" ],
+            "vals" : ".+"
+        }
+    }
+}
