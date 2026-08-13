@@ -28,6 +28,10 @@ The start script accepts these parameters:
 - `--sysfs-trace-setup <cmd>` — Setup commands for sysfs-trace (repeatable)
 - `--sysfs-trace-cleanup <cmd>` — Cleanup commands for sysfs-trace (repeatable)
 
+The stop script additionally accepts:
+- `--perf-gen-local-report` — Generate a local `perf-report.txt` alongside the archived `perf.data` (a no-argument flag at the script level -- passing it at all triggers report generation, regardless of any value supplied)
+- `--sysfs-trace-collection <system|per-cpu>` — Trace buffer collection mode (default: `per-cpu`)
+
 ## Integration
 
 Kerneltools runs as a profiler tool on endpoint nodes. It is allowed on profiler, master, and worker collector roles but blocked on client and server roles. Data compression and post-processing (perf archive, trace-cmd reports) happens at stop time. The CDM post-processor (`kerneltools-post-process.py`) converts turbostat output into crucible's canonical metric format; other subtools are unaffected.

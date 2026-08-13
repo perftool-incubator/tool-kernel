@@ -26,7 +26,8 @@
         }
       ],
       "output_files": [
-        "turbostat-stdout.txt.xz"
+        "turbostat-stdout.txt.xz",
+        "turbostat-stderr.txt"
       ]
     },
     {
@@ -66,6 +67,7 @@
       "description": "Direct ftrace sysfs interface tracing, with user-supplied setup/cleanup shell commands. Per-CPU trace buffers are archived by default (one dynamically-named 'trace.cpu<N>.out.xz' file per traced CPU); '--sysfs-trace-collection system' archives a single 'trace.out.xz' instead.",
       "cdm_indexed": false,
       "output_files": [
+        "trace.cpu<N>.out.xz",
         "trace.out.xz"
       ]
     }
