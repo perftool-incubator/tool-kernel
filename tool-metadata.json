@@ -31,11 +31,11 @@
     },
     {
       "name": "perf",
-      "description": "Hardware performance counter sampling (IPC, cache misses, branch stats) via 'perf record'.",
+      "description": "Hardware performance counter sampling (IPC, cache misses, branch stats) via 'perf record'. '--perf-gen-local-report enable' additionally generates 'perf-report.txt'.",
       "cdm_indexed": false,
       "output_files": [
         "perf.data.xz",
-        "perf-report.txt"
+        "perf.data.tar.bz2"
       ]
     },
     {

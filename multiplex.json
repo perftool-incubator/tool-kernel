@@ -18,13 +18,18 @@
         },
         "enable_disable" : {
             "description" : "enable or disable",
-            "args" : [ "base-freq", "turbo-freq", "core-power" ],
+            "args" : [ "base-freq", "turbo-freq", "core-power", "perf-gen-local-report" ],
             "vals": "^(enable|disable)$"
         },
         "generic_string" : {
             "description" : "all types of strings",
             "args" : [ "record-opts", "trace-cmd-record-opts", "sysfs-trace-setup", "sysfs-trace-cleanup" ],
             "vals" : ".+"
+        },
+        "sysfs_trace_collection_mode" : {
+            "description" : "trace buffer collection mode",
+            "args" : [ "sysfs-trace-collection" ],
+            "vals": "^(system|per-cpu)$"
         }
     }
 }
