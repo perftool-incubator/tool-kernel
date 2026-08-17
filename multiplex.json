@@ -23,8 +23,14 @@
         },
         "generic_string" : {
             "description" : "all types of strings",
-            "args" : [ "record-opts", "trace-cmd-record-opts", "sysfs-trace-setup", "sysfs-trace-cleanup" ],
+            "args" : [ "record-opts", "trace-cmd-record-opts" ],
             "vals" : ".+"
+        },
+        "sysfs_trace_command" : {
+            "description" : "a setup/cleanup command for sysfs-trace -- may be specified more than once, each occurrence run in order (kerneltools-start/-stop accumulate these into an array)",
+            "args" : [ "sysfs-trace-setup", "sysfs-trace-cleanup" ],
+            "vals" : ".+",
+            "repeatable" : true
         },
         "sysfs_trace_collection_mode" : {
             "description" : "trace buffer collection mode",
