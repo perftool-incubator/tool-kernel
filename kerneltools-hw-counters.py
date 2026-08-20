@@ -6,6 +6,7 @@ import time
 import struct
 import platform
 import signal
+import resource
 
 def get_online_cpus():
     try:
@@ -49,11 +50,32 @@ def make_attr(type_, config, read_format, flags):
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: kerneltools-hw-counters.py <interval_seconds> [output_file]")
+        print("Usage: kerneltools-hw-counters.py <interval_seconds> [output_file] [cpu_list]")
+        print("  cpu_list: comma-separated CPUs or ranges, e.g. 192-207,576-591")
         sys.exit(1)
+
+    # Raise fd limit for large systems (768-CPU Turin needs many fds)
+    try:
+        _soft, _hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+        if _soft < 8192:
+            resource.setrlimit(resource.RLIMIT_NOFILE, (min(8192, _hard), _hard))
+    except Exception:
+        pass
 
     interval = float(sys.argv[1])
     output_file = sys.argv[2] if len(sys.argv) > 2 else "hw-counters-stdout.txt"
+
+    # Optional CPU filter: parse cpu_list argument (e.g. "192-207,576-591")
+    if len(sys.argv) > 3:
+        cpu_filter = set()
+        for part in sys.argv[3].split(","):
+            if "-" in part:
+                lo, hi = part.split("-")
+                cpu_filter.update(range(int(lo), int(hi) + 1))
+            else:
+                cpu_filter.add(int(part))
+        cpus = [c for c in cpus if c in cpu_filter]
+        print("CPU filter active: monitoring %d CPUs" % len(cpus))
 
     cpus = get_online_cpus()
     print(f"Monitoring CPUs: {cpus} at interval {interval}s")
@@ -116,6 +138,33 @@ def main():
 
     print(f"Successfully started hardware performance counters on {opened_count} CPUs.")
 
+    # ── AMD UMC memory controller bandwidth ──────────────────────────────────
+    UMC_CAS_ALL_EVENT = 0x0a  # umc_cas_cmd.all EventCode (Zen4/5)
+    UMC_BYTES_PER_CAS = 64
+    umc_fds = {}  # name -> fd
+    prev_umc = {}
+    umc_base = "/sys/bus/event_source/devices"
+    if os.path.isdir(umc_base):
+        for umc_name in sorted(os.listdir(umc_base)):
+            if not umc_name.startswith("amd_umc_"):
+                continue
+            try:
+                pmu_path = os.path.join(umc_base, umc_name)
+                pmu_type = int(open(os.path.join(pmu_path, "type")).read().strip())
+                cpu = int(open(os.path.join(pmu_path, "cpumask")).read().strip().split(",")[0].split("-")[0])
+                attr = struct.pack("<IIQQQQQ", pmu_type, 120, UMC_CAS_ALL_EVENT, 0, 0, 0, 1)
+                attr += b"\x00" * (120 - len(attr))
+                fd = libc.syscall(SYS_perf_event_open, attr, -1, cpu, -1, 0)
+                if fd < 0:
+                    continue
+                libc.ioctl(fd, PERF_EVENT_IOC_RESET, 0)
+                libc.ioctl(fd, PERF_EVENT_IOC_ENABLE, 0)
+                umc_fds[umc_name] = fd
+                prev_umc[umc_name] = 0
+            except Exception as e:
+                print("WARNING: UMC %s: %s" % (umc_name, e))
+        print("Opened %d AMD UMC CAS counters" % len(umc_fds))
+
     # Graceful stop handler
     running = True
     def stop_handler(signum, frame):
@@ -165,6 +214,18 @@ def main():
                 except Exception as e:
                     print(f"WARNING: error reading CPU {cpu}: {e}")
                     
+            # ── UMC CAS read -> bytes/sec ──────────────────────────────────────────
+            for umc_name, umc_fd in umc_fds.items():
+                try:
+                    raw = os.read(umc_fd, 8)
+                    if len(raw) < 8:
+                        continue
+                    count = struct.unpack("<Q", raw)[0]
+                    delta = max(0, count - prev_umc[umc_name])
+                    prev_umc[umc_name] = count
+                    out.write("%d,%s,%d,%d\n" % (now_ms, umc_name, delta, delta * UMC_BYTES_PER_CAS))
+                except Exception as e:
+                    print("WARNING: reading %s: %s" % (umc_name, e))
             out.flush()
 
     # Disable and close
@@ -178,6 +239,12 @@ def main():
             except Exception:
                 pass
 
+    for umc_fd in umc_fds.values():
+        try:
+            libc.ioctl(umc_fd, PERF_EVENT_IOC_DISABLE, 0)
+            os.close(umc_fd)
+        except Exception:
+            pass
     print("Shutdown complete.")
 
 if __name__ == "__main__":
