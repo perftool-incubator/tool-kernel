@@ -40,6 +40,7 @@ toplev — system-wide Top-Down Methodology (from `toplev.py -l3 -I N -x ,`):
 from __future__ import annotations
 
 import os
+import json
 import re
 import sys
 import time
@@ -358,60 +359,39 @@ def process_hw_counters(log_file: str) -> None:
         line = raw_line.strip()
         if not line or line.startswith("#"):
             continue
-        parts = line.split(",")
-        if len(parts) < 7:
-            continue
         try:
-            ts_ms = int(parts[0])
-            cpu = parts[1].strip()
-            cycles = float(parts[2])
-            instructions = float(parts[3])
-            cache_misses = float(parts[4])
-            stall_backend = float(parts[5])
-            stall_frontend = float(parts[6])
-        except (ValueError, IndexError):
+            rec = json.loads(line)
+        except json.JSONDecodeError:
             continue
-
-        # Strip "CPU" prefix for breakout name
-        cpu_num = cpu.replace("CPU", "") if cpu.startswith("CPU") else cpu
-        names = {"cpu": cpu_num}
-        sample_base = {"end": ts_ms}
-
-        if cycles > 0 and instructions > 0:
-            ipc = instructions / cycles
-            metrics.log_sample(
-                SOURCE_PERF_STAT,
-                {"source": SOURCE_PERF_STAT, "class": "throughput", "type": "ipc"},
-                names,
-                {**sample_base, "value": ipc},
-            )
-
-        if cycles > 0:
-            rate = cache_misses / cycles * 100.0
-            metrics.log_sample(
-                SOURCE_PERF_STAT,
-                {"source": SOURCE_PERF_STAT, "class": "utilization", "type": "cache-miss-rate"},
-                names,
-                {**sample_base, "value": rate},
-            )
-
-            rate = stall_backend / cycles * 100.0
-            metrics.log_sample(
-                SOURCE_PERF_STAT,
-                {"source": SOURCE_PERF_STAT, "class": "utilization", "type": "stall-backend-rate"},
-                names,
-                {**sample_base, "value": rate},
-            )
-
-            rate = stall_frontend / cycles * 100.0
-            metrics.log_sample(
-                SOURCE_PERF_STAT,
-                {"source": SOURCE_PERF_STAT, "class": "utilization", "type": "stall-frontend-rate"},
-                names,
-                {**sample_base, "value": rate},
-            )
-
-        found += 1
+        kind = rec.get("kind")
+        ts_ms = rec.get("ts_ms", 0)
+        if kind == "meta":
+            continue
+        elif kind == "cpu":
+            cpu_num = str(rec.get("cpu", "?"))
+            cycles = rec.get("cycles", 0)
+            instructions = rec.get("instructions", 0)
+            cache_misses = rec.get("cache_misses", 0)
+            stall_backend = rec.get("stall_backend", 0)
+            stall_frontend = rec.get("stall_frontend", 0)
+            names = {"cpu": cpu_num}
+            sample_base = {"end": ts_ms}
+            if cycles > 0 and instructions > 0:
+                metrics.log_sample(SOURCE_PERF_STAT, {"source": SOURCE_PERF_STAT, "class": "throughput", "type": "ipc"}, names, {**sample_base, "value": instructions / cycles})
+            if cycles > 0:
+                metrics.log_sample(SOURCE_PERF_STAT, {"source": SOURCE_PERF_STAT, "class": "utilization", "type": "cache-miss-rate"}, names, {**sample_base, "value": cache_misses / cycles * 100.0})
+                metrics.log_sample(SOURCE_PERF_STAT, {"source": SOURCE_PERF_STAT, "class": "utilization", "type": "stall-backend-rate"}, names, {**sample_base, "value": stall_backend / cycles * 100.0})
+                metrics.log_sample(SOURCE_PERF_STAT, {"source": SOURCE_PERF_STAT, "class": "utilization", "type": "stall-frontend-rate"}, names, {**sample_base, "value": stall_frontend / cycles * 100.0})
+            found += 1
+        elif kind == "umc":
+            umc_name = rec.get("umc", "unknown")
+            bytes_val = rec.get("bytes", 0)
+            cas_delta = rec.get("cas_delta", 0)
+            names = {"umc": umc_name}
+            sample_base = {"end": ts_ms}
+            metrics.log_sample("hw-umc", {"source": "hw-umc", "class": "throughput", "type": "bytes-sec"}, names, {**sample_base, "value": bytes_val})
+            metrics.log_sample("hw-umc", {"source": "hw-umc", "class": "count", "type": "cas-count"}, names, {**sample_base, "value": cas_delta})
+            found += 1
 
     fh.close()
 
