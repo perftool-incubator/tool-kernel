@@ -21,6 +21,7 @@ echo
 subtools="turbostat" # subtools that will be used, any combination of: turbostat,perf,hw-counters,perf-stat,toplev,speed-select-util,trace-cmd,sysfs-trace <no-spaces>
 interval=10
 record_opts=""
+cpu_list=""
 base_freq=""
 core_power=""
 turbo_freq=""
@@ -28,7 +29,7 @@ trace_cmd_record_opts=""
 sysfs_trace_setup_cmds=()
 
 echo "Processing arguments"
-longopts="subtools:,record-opts:,interval:,base-freq:,turbo-freq:,core-power:,trace-cmd-record-opts:,sysfs-trace-setup:,sysfs-trace-cleanup:"
+longopts="subtools:,record-opts:,cpu-list:,interval:,base-freq:,turbo-freq:,core-power:,trace-cmd-record-opts:,sysfs-trace-setup:,sysfs-trace-cleanup:"
 opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
 eval set -- "$opts";
 while true; do
@@ -51,6 +52,10 @@ while true; do
         --record-opts)
             record_opts=$val
             echo "setting record_opts=$record_opts"
+            ;;
+        --cpu-list)
+            cpu_list=$val
+            echo "setting cpu_list=$cpu_list"
             ;;
         --base-freq)
             base_freq=$val
@@ -127,7 +132,7 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
             ;;
         hw-counters)
             echo "Starting hw-counters (direct PMU counter reads via python)"
-            python3 kerneltools-hw-counters.py "$interval" hw-counters-stdout.txt > hw-counters-stderr.txt 2>&1 &
+            python3 kerneltools-hw-counters.py "$interval" hw-counters-stdout.txt "$cpu_list" > hw-counters-stderr.txt 2>&1 &
             hw_counters_pid=$!
             echo "hw-counters pid is $hw_counters_pid"
             echo "$hw_counters_pid" >>kerneltools-pids.txt
