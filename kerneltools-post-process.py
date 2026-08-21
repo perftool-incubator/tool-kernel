@@ -110,7 +110,7 @@ def process_turbostat(log_file: str) -> None:
         if package == "-":
             # System aggregate row
             for metric_type, cdm_class, col in (
-                ("cpu-busy-pct",       "utilization", "Busy%"),
+                ("cpu-busy-pct",       "percentage", "Busy%"),
                 ("cpu-freq-avg-mhz",   "throughput",  "Avg_MHz"),
                 ("package-power-watt", "throughput",  "PkgWatt"),
             ):
@@ -127,10 +127,10 @@ def process_turbostat(log_file: str) -> None:
                 continue
             names = {"cpu": cpu_num}
             for metric_type, cdm_class, col in (
-                ("cpu-busy-pct",      "utilization", "Busy%"),
+                ("cpu-busy-pct",      "percentage", "Busy%"),
                 ("cpu-busy-freq-mhz", "throughput",  "Bzy_MHz"),
-                ("c1-pct",            "utilization", "C1%"),
-                ("c2-pct",            "utilization", "C2%"),
+                ("c1-pct",            "percentage", "C1%"),
+                ("c2-pct",            "percentage", "C2%"),
                 ("ipc",               "throughput",  "IPC"),
             ):
                 val = _safe_float(fields, col_idx, col)
