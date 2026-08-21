@@ -132,7 +132,7 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
             ;;
         hw-counters)
             echo "Starting hw-counters (direct PMU counter reads via python)"
-            python3 kerneltools-hw-counters.py "$interval" hw-counters-stdout.txt "$cpu_list" > hw-counters-stderr.txt 2>&1 &
+            python3 /usr/bin/kerneltools-hw-counters.py "$interval" hw-counters-stdout.txt "$cpu_list" > hw-counters-stderr.txt 2>&1 &
             hw_counters_pid=$!
             echo "hw-counters pid is $hw_counters_pid"
             echo "$hw_counters_pid" >>kerneltools-pids.txt
