@@ -387,7 +387,9 @@ def process_hw_counters(log_file: str) -> None:
             umc_name = rec.get("umc", "unknown")
             bytes_val = rec.get("bytes", 0)
             cas_delta = rec.get("cas_delta", 0)
-            names = {"umc": umc_name}
+            # Strip amd_umc_ prefix and use num (existing CDM field) for the breakout
+            umc_num = umc_name.replace("amd_umc_", "") if umc_name.startswith("amd_umc_") else umc_name
+            names = {"num": umc_num}
             sample_base = {"end": ts_ms}
             metrics.log_sample("hw-umc", {"source": "hw-umc", "class": "throughput", "type": "bytes-sec"}, names, {**sample_base, "value": bytes_val})
             metrics.log_sample("hw-umc", {"source": "hw-umc", "class": "count", "type": "cas-count"}, names, {**sample_base, "value": cas_delta})
