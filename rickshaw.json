@@ -14,30 +14,50 @@
             {
                 "src": "%tool-dir%/kerneltools-stop",
                 "dest": "/usr/bin/"
+            },
+            {
+                "src": "%tool-dir%/kerneltools-hw-counters.py",
+                "dest": "/usr/bin/"
+            },
+            {
+                "src": "%tool-dir%/kerneltools-post-process.py",
+                "dest": "/usr/bin/"
             }
         ],
         "blacklist": [
             {
                 "endpoint": "remotehosts",
-                "collector-types": [ "client", "server" ]
+                "collector-types": [
+                    "client",
+                    "server"
+                ]
             },
             {
                 "endpoint": "kube",
-                "collector-types": [ "client", "server" ]
+                "collector-types": [
+                    "client",
+                    "server"
+                ]
             }
         ],
         "whitelist": [
             {
                 "endpoint": "osp",
-                "collector-types": [ "compute" ]
+                "collector-types": [
+                    "compute"
+                ]
             },
             {
                 "endpoint": "remotehosts",
-                "collector-types": [ "profiler" ]
+                "collector-types": [
+                    "profiler"
+                ]
             },
             {
                 "endpoint": "kube",
-                "collector-types": [ "profiler" ]
+                "collector-types": [
+                    "profiler"
+                ]
             }
         ],
         "start": "kerneltools-start",
