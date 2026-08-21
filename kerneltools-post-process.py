@@ -315,7 +315,7 @@ def process_perf_stat(log_file: str) -> None:
             rate = cache_miss / cache_ref * 100.0
             metrics.log_sample(
                 SOURCE_PERF_STAT,
-                {"source": SOURCE_PERF_STAT, "class": "utilization", "type": "cache-miss-rate"},
+                {"source": SOURCE_PERF_STAT, "class": "percentage", "type": "cache-miss-rate"},
                 names,
                 {**sample_base, "value": rate},
             )
@@ -324,7 +324,7 @@ def process_perf_stat(log_file: str) -> None:
             rate = stall_backend / cycles * 100.0
             metrics.log_sample(
                 SOURCE_PERF_STAT,
-                {"source": SOURCE_PERF_STAT, "class": "utilization", "type": "backend-stall-rate"},
+                {"source": SOURCE_PERF_STAT, "class": "percentage", "type": "backend-stall-rate"},
                 names,
                 {**sample_base, "value": rate},
             )
@@ -333,7 +333,7 @@ def process_perf_stat(log_file: str) -> None:
             rate = stall_frontend / cycles * 100.0
             metrics.log_sample(
                 SOURCE_PERF_STAT,
-                {"source": SOURCE_PERF_STAT, "class": "utilization", "type": "frontend-stall-rate"},
+                {"source": SOURCE_PERF_STAT, "class": "percentage", "type": "frontend-stall-rate"},
                 names,
                 {**sample_base, "value": rate},
             )
@@ -379,9 +379,9 @@ def process_hw_counters(log_file: str) -> None:
             if cycles > 0 and instructions > 0:
                 metrics.log_sample(SOURCE_PERF_STAT, {"source": SOURCE_PERF_STAT, "class": "throughput", "type": "ipc"}, names, {**sample_base, "value": instructions / cycles})
             if cycles > 0:
-                metrics.log_sample(SOURCE_PERF_STAT, {"source": SOURCE_PERF_STAT, "class": "utilization", "type": "cache-miss-rate"}, names, {**sample_base, "value": cache_misses / cycles * 100.0})
-                metrics.log_sample(SOURCE_PERF_STAT, {"source": SOURCE_PERF_STAT, "class": "utilization", "type": "stall-backend-rate"}, names, {**sample_base, "value": stall_backend / cycles * 100.0})
-                metrics.log_sample(SOURCE_PERF_STAT, {"source": SOURCE_PERF_STAT, "class": "utilization", "type": "stall-frontend-rate"}, names, {**sample_base, "value": stall_frontend / cycles * 100.0})
+                metrics.log_sample(SOURCE_PERF_STAT, {"source": SOURCE_PERF_STAT, "class": "percentage", "type": "cache-miss-rate"}, names, {**sample_base, "value": cache_misses / cycles * 100.0})
+                metrics.log_sample(SOURCE_PERF_STAT, {"source": SOURCE_PERF_STAT, "class": "percentage", "type": "stall-backend-rate"}, names, {**sample_base, "value": stall_backend / cycles * 100.0})
+                metrics.log_sample(SOURCE_PERF_STAT, {"source": SOURCE_PERF_STAT, "class": "percentage", "type": "stall-frontend-rate"}, names, {**sample_base, "value": stall_frontend / cycles * 100.0})
             found += 1
         elif kind == "umc":
             umc_name = rec.get("umc", "unknown")
@@ -458,7 +458,7 @@ def process_toplev(log_file: str) -> None:
             boot_time = get_boot_time(ts_s)
         ts_epoch_s = ts_s + boot_time
         ts_ms = int(round(ts_epoch_s * 1000))
-        desc = {"source": SOURCE_TOPLEV, "class": "utilization", "type": cdm_type}
+        desc = {"source": SOURCE_TOPLEV, "class": "percentage", "type": cdm_type}
         metrics.log_sample(SOURCE_TOPLEV, desc, {}, {"end": ts_ms, "value": value})
         found += 1
 
