@@ -11,6 +11,9 @@ Kerneltools runs one or more subtools during test execution:
 |---------|---------|
 | turbostat | CPU power and frequency monitoring (x86) |
 | perf | CPU profiling and hardware event recording |
+| perf-stat | Lightweight per-CPU IPC and stall breakdown via perf stat |
+| toplev | Top-Down Methodology analysis (x86 Intel) |
+| hw-counters | Direct PMU counter reads and AMD UMC memory controller bandwidth via Python |
 | intel-speed-select | CPU frequency scaling controls (x86) |
 | trace-cmd | Kernel function tracing via ftrace |
 | sysfs-trace | Direct kernel trace buffer access via debugfs |
@@ -20,6 +23,9 @@ Kerneltools runs one or more subtools during test execution:
 The start script accepts these parameters:
 - `--subtools <list>` — Comma-separated subtools to run (default: `turbostat`)
 - `--interval <seconds>` — Collection interval (default: `10`)
+- `--cpu-list <list>` — Comma-separated CPUs or ranges for hw-counters (e.g. `192-207,576-591`)
+- `--umc-list <list>` — Comma-separated UMC indices or ranges for hw-counters (e.g. `0-7,8-15`)
+- `--umc-events <list>` — Comma-separated AMD UMC events: `cas_all`, `cas_rd`, `cas_wr` (default: `cas_all`)
 - `--record-opts <opts>` — Additional options passed to perf record
 - `--base-freq <freq>` — Base frequency for turbostat
 - `--turbo-freq <freq>` — Turbo frequency for turbostat
@@ -30,4 +36,4 @@ The start script accepts these parameters:
 
 ## Integration
 
-Kerneltools runs as a profiler tool on endpoint nodes. It is allowed on profiler, master, and worker collector roles but blocked on client and server roles. Data compression and post-processing (perf archive, trace-cmd reports) happens at stop time.
+Kerneltools runs as a profiler tool on endpoint nodes. It is allowed on profiler, master, and worker collector roles but blocked on client and server roles. Output data is post-processed into CDM metrics by `kerneltools-post-process.py`.

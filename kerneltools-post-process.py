@@ -6,7 +6,7 @@
 
 Runs in the kernel tool's data directory (one per profiler instance).
 Dispatches to per-subtool handlers based on which output files exist.
-Currently handles: turbostat, perf-stat, toplev.
+Currently handles: turbostat, perf-stat, toplev, hw-counters.
 
 Metrics emitted
 ---------------
@@ -24,17 +24,29 @@ turbostat — per-CPU (numeric CPU field):
 
 perf-stat — per-CPU (from `perf stat -a -A -I N -x , -e cycles,instructions,...`):
     perf-stat:ipc                       throughput         {cpu: N}
-    perf-stat:cache-miss-rate           utilization  %     {cpu: N}
-    perf-stat:backend-stall-rate        utilization  %     {cpu: N}
-    perf-stat:frontend-stall-rate       utilization  %     {cpu: N}
+    perf-stat:cache-miss-rate           percentage   %     {cpu: N}
+    perf-stat:backend-stall-rate        percentage   %     {cpu: N}
+    perf-stat:frontend-stall-rate       percentage   %     {cpu: N}
 
 toplev — system-wide Top-Down Methodology (from `toplev.py -l3 -I N -x ,`):
-    toplev:frontend-bound           utilization  %
-    toplev:backend-bound            utilization  %
-    toplev:memory-bound             utilization  %
-    toplev:core-bound               utilization  %
-    toplev:bad-speculation          utilization  %
-    toplev:retiring                 utilization  %
+    toplev:frontend-bound           percentage   %
+    toplev:backend-bound            percentage   %
+    toplev:memory-bound             percentage   %
+    toplev:core-bound               percentage   %
+    toplev:bad-speculation          percentage   %
+    toplev:retiring                 percentage   %
+
+hw-counters — per-CPU and per-UMC:
+    perf-stat:ipc                       throughput         {cpu: N}
+    perf-stat:cache-miss-rate           percentage   %     {cpu: N}
+    perf-stat:backend-stall-rate        percentage   %     {cpu: N}
+    perf-stat:frontend-stall-rate       percentage   %     {cpu: N}
+    hw-umc:bytes-sec                    throughput   B/s   {num: N}
+    hw-umc:cas-count                    count              {num: N}
+    hw-umc:rd-bytes-sec                 throughput   B/s   {num: N}
+    hw-umc:cas-rd-count                 count              {num: N}
+    hw-umc:wr-bytes-sec                 throughput   B/s   {num: N}
+    hw-umc:cas-wr-count                 count              {num: N}
 """
 
 from __future__ import annotations
@@ -385,14 +397,23 @@ def process_hw_counters(log_file: str) -> None:
             found += 1
         elif kind == "umc":
             umc_name = rec.get("umc", "unknown")
+            ev_name = rec.get("event", "cas_all")
             bytes_val = rec.get("bytes", 0)
             cas_delta = rec.get("cas_delta", 0)
             # Strip amd_umc_ prefix and use num (existing CDM field) for the breakout
             umc_num = umc_name.replace("amd_umc_", "") if umc_name.startswith("amd_umc_") else umc_name
             names = {"num": umc_num}
             sample_base = {"end": ts_ms}
-            metrics.log_sample("hw-umc", {"source": "hw-umc", "class": "throughput", "type": "bytes-sec"}, names, {**sample_base, "value": bytes_val})
-            metrics.log_sample("hw-umc", {"source": "hw-umc", "class": "count", "type": "cas-count"}, names, {**sample_base, "value": cas_delta})
+
+            if ev_name == "cas_rd":
+                metrics.log_sample("hw-umc", {"source": "hw-umc", "class": "throughput", "type": "rd-bytes-sec"}, names, {**sample_base, "value": bytes_val})
+                metrics.log_sample("hw-umc", {"source": "hw-umc", "class": "count", "type": "cas-rd-count"}, names, {**sample_base, "value": cas_delta})
+            elif ev_name == "cas_wr":
+                metrics.log_sample("hw-umc", {"source": "hw-umc", "class": "throughput", "type": "wr-bytes-sec"}, names, {**sample_base, "value": bytes_val})
+                metrics.log_sample("hw-umc", {"source": "hw-umc", "class": "count", "type": "cas-wr-count"}, names, {**sample_base, "value": cas_delta})
+            else:
+                metrics.log_sample("hw-umc", {"source": "hw-umc", "class": "throughput", "type": "bytes-sec"}, names, {**sample_base, "value": bytes_val})
+                metrics.log_sample("hw-umc", {"source": "hw-umc", "class": "count", "type": "cas-count"}, names, {**sample_base, "value": cas_delta})
             found += 1
 
     fh.close()
