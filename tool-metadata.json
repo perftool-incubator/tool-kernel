@@ -1,0 +1,75 @@
+{
+  "rickshaw-tool-metadata": {
+    "schema": {
+      "version": "2026.08.11"
+    }
+  },
+  "tool": "kernel",
+  "description": "Linux kernel performance tools -- CPU frequency, power, hardware counters, and kernel tracing, via a set of independently-selectable subtools.",
+  "subtools": [
+    {
+      "name": "turbostat",
+      "description": "CPU frequency, power, and thermal monitoring via periodic MSR polling.",
+      "cdm_indexed": true,
+      "cdm_sources": [
+        {
+          "source": "turbostat",
+          "types": [
+            "cpu-busy-pct",
+            "cpu-freq-avg-mhz",
+            "package-power-watt",
+            "cpu-busy-freq-mhz",
+            "c1-pct",
+            "c2-pct",
+            "ipc"
+          ]
+        }
+      ],
+      "output_files": [
+        "turbostat-stdout.txt.xz",
+        "turbostat-stderr.txt"
+      ]
+    },
+    {
+      "name": "perf",
+      "description": "Hardware performance counter sampling (IPC, cache misses, branch stats) via 'perf record'. '--perf-gen-local-report ON' additionally generates 'perf-report.txt'.",
+      "cdm_indexed": false,
+      "output_files": [
+        "perf.data.xz",
+        "perf.data.tar.bz2"
+      ]
+    },
+    {
+      "name": "intel-speed-select",
+      "description": "Intel Speed Select Technology (base-freq/turbo-freq/core-power) configuration and status reporting.",
+      "cdm_indexed": false,
+      "output_files": [
+        "settings.txt",
+        "perf-profile_info.txt",
+        "perf-profile_get-lock-status.txt",
+        "perf-profile_get-config-levels.txt",
+        "perf-profile_get-config-version.txt",
+        "perf-profile_get-config-enabled.txt",
+        "perf-profile_get-config-current-level.txt"
+      ]
+    },
+    {
+      "name": "trace-cmd",
+      "description": "Ftrace-based kernel event tracing via 'trace-cmd record'.",
+      "cdm_indexed": false,
+      "output_files": [
+        "trace-cmd-report.txt.xz",
+        "trace.dat.xz"
+      ]
+    },
+    {
+      "name": "sysfs-trace",
+      "description": "Direct ftrace sysfs interface tracing, with user-supplied setup/cleanup shell commands. Per-CPU trace buffers are archived by default (one dynamically-named 'trace.cpu<N>.out.xz' file per traced CPU); '--sysfs-trace-collection system' archives a single 'trace.out.xz' instead.",
+      "cdm_indexed": false,
+      "output_files": [
+        "trace.cpu<N>.out.xz",
+        "trace.out.xz"
+      ]
+    }
+  ]
+}

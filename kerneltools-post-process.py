@@ -81,6 +81,7 @@ def _safe_float(fields: list[str], col_idx: dict[str, int], name: str) -> float 
 def process_turbostat(log_file: str) -> None:
     print(f"Post-processing turbostat: {log_file}")
     metrics = CDMMetrics()
+    metric_idx_cache: dict[tuple, int] = {}
 
     try:
         fh, _ = open_read_text_file(log_file)
@@ -121,15 +122,22 @@ def process_turbostat(log_file: str) -> None:
 
         if package == "-":
             # System aggregate row
-            for metric_type, cdm_class, col in (
-                ("cpu-busy-pct",       "percentage", "Busy%"),
-                ("cpu-freq-avg-mhz",   "throughput",  "Avg_MHz"),
-                ("package-power-watt", "throughput",  "PkgWatt"),
+            for metric_type, cdm_class, default_agg, col in (
+                ("cpu-busy-pct",       "percentage",  "avg", "Busy%"),
+                ("cpu-freq-avg-mhz",   "throughput",  "avg", "Avg_MHz"),
+                ("package-power-watt", "throughput",  "sum", "PkgWatt"),
             ):
                 val = _safe_float(fields, col_idx, col)
                 if val is not None:
-                    desc = {"source": SOURCE, "class": cdm_class, "type": metric_type}
-                    metrics.log_sample(SOURCE, desc, {}, {**sample_base, "value": val})
+                    if cdm_class == "percentage":
+                        val /= 100
+                    cache_key = ("system", metric_type)
+                    if cache_key in metric_idx_cache:
+                        metrics.log_sample_by_idx(metric_idx_cache[cache_key], val, ts_ms)
+                    else:
+                        desc = {"source": SOURCE, "class": cdm_class, "type": metric_type, "default-aggregation": default_agg}
+                        idx = metrics.log_sample(SOURCE, desc, {}, {**sample_base, "value": val})
+                        metric_idx_cache[cache_key] = idx
 
         elif cpu_field not in ("-", ""):
             # Per-CPU row
@@ -138,17 +146,24 @@ def process_turbostat(log_file: str) -> None:
             except ValueError:
                 continue
             names = {"cpu": cpu_num}
-            for metric_type, cdm_class, col in (
-                ("cpu-busy-pct",      "percentage", "Busy%"),
-                ("cpu-busy-freq-mhz", "throughput",  "Bzy_MHz"),
-                ("c1-pct",            "percentage", "C1%"),
-                ("c2-pct",            "percentage", "C2%"),
-                ("ipc",               "throughput",  "IPC"),
+            for metric_type, cdm_class, default_agg, col in (
+                ("cpu-busy-pct",      "percentage",  "avg", "Busy%"),
+                ("cpu-busy-freq-mhz", "throughput",  "avg", "Bzy_MHz"),
+                ("c1-pct",            "percentage",  "avg", "C1%"),
+                ("c2-pct",            "percentage",  "avg", "C2%"),
+                ("ipc",               "throughput",  "avg", "IPC"),
             ):
                 val = _safe_float(fields, col_idx, col)
                 if val is not None:
-                    desc = {"source": SOURCE, "class": cdm_class, "type": metric_type}
-                    metrics.log_sample(SOURCE, desc, names, {**sample_base, "value": val})
+                    if cdm_class == "percentage":
+                        val /= 100
+                    cache_key = ("cpu", cpu_num, metric_type)
+                    if cache_key in metric_idx_cache:
+                        metrics.log_sample_by_idx(metric_idx_cache[cache_key], val, ts_ms)
+                    else:
+                        desc = {"source": SOURCE, "class": cdm_class, "type": metric_type, "default-aggregation": default_agg}
+                        idx = metrics.log_sample(SOURCE, desc, names, {**sample_base, "value": val})
+                        metric_idx_cache[cache_key] = idx
 
     fh.close()
     metrics.finish_samples()
