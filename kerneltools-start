@@ -18,9 +18,12 @@ echo "mount:"
 mount
 echo
 # defaults
-subtools="turbostat" # subtools that will be used, any combination of: turbostat,perf,speed-select-util,trace-cmd,sysfs-trace <no-spaces>
+subtools="turbostat" # subtools that will be used, any combination of: turbostat,perf,hw-counters,perf-stat,toplev,speed-select-util,trace-cmd,sysfs-trace <no-spaces>
 interval=10
 record_opts=""
+cpu_list=""
+umc_list=""
+umc_events="cas_all"
 base_freq=""
 core_power=""
 turbo_freq=""
@@ -28,7 +31,7 @@ trace_cmd_record_opts=""
 sysfs_trace_setup_cmds=()
 
 echo "Processing arguments"
-longopts="subtools:,record-opts:,interval:,base-freq:,turbo-freq:,core-power:,trace-cmd-record-opts:,sysfs-trace-setup:,sysfs-trace-cleanup:"
+longopts="subtools:,record-opts:,cpu-list:,umc-list:,umc-events:,interval:,base-freq:,turbo-freq:,core-power:,trace-cmd-record-opts:,sysfs-trace-setup:,sysfs-trace-cleanup:"
 opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
 eval set -- "$opts";
 while true; do
@@ -51,6 +54,18 @@ while true; do
         --record-opts)
             record_opts=$val
             echo "setting record_opts=$record_opts"
+            ;;
+        --cpu-list)
+            cpu_list=$val
+            echo "setting cpu_list=$cpu_list"
+            ;;
+        --umc-list)
+            umc_list=$val
+            echo "setting umc_list=$umc_list"
+            ;;
+        --umc-events)
+            umc_events=$val
+            echo "setting umc_events=$umc_events"
             ;;
         --base-freq)
             base_freq=$val
@@ -81,6 +96,14 @@ while true; do
     esac
 done
 
+# Record system boot time in seconds since epoch
+boot_time=$(date -u --date="$(TZ=UTC uptime -s)" +%s)
+echo "System boot time since epoch: $boot_time"
+echo "$boot_time" > kerneltools-boot-time.txt
+
+# Record configured interval size
+echo "$interval" > kerneltools-interval.txt
+
 /bin/rm -f kerneltools-pids.txt
 for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
     case "$subtool" in
@@ -102,6 +125,45 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
             turbo_pid=$!
             echo "turbostat pid is $turbo_pid"
             echo "$turbo_pid" >>kerneltools-pids.txt
+            ;;
+        toplev)
+            echo "Starting toplev (Top-Down Methodology analysis at ${interval}s intervals)"
+            # debugfs required for PMU event access
+            grep -q debugfs /proc/mounts || mount -t debugfs none /sys/kernel/debug 2>/dev/null || true
+            # toplev.py -l3: three-level Top-Down breakdown (Frontend/Backend-Memory/Backend-Core)
+            # -I <ms>: report every N milliseconds  -x ,: CSV output for parsing
+            # -a: system-wide  --no-multiplex: avoid multiplexing errors on busy systems
+            python3 /usr/local/share/pmu-tools/toplev.py \
+                -l3 -I "$((interval * 1000))" -x , -a --no-multiplex \
+                > toplev-stdout.txt 2>&1 &
+            toplev_pid=$!
+            echo "toplev pid is $toplev_pid"
+            echo "$toplev_pid" >>kerneltools-pids.txt
+            ;;
+        hw-counters)
+            echo "Starting hw-counters (direct PMU counter reads via python)"
+            python3 /usr/bin/kerneltools-hw-counters.py "$interval" hw-counters-stdout.txt "$cpu_list" "$umc_list" "$umc_events" > hw-counters-stderr.txt 2>&1 &
+            hw_counters_pid=$!
+            echo "hw-counters pid is $hw_counters_pid"
+            echo "$hw_counters_pid" >>kerneltools-pids.txt
+            ;;
+        perf-stat)
+            echo "Starting perf-stat (per-CPU IPC at ${interval}s intervals)"
+            # debugfs required for some PMU event access
+            grep -q debugfs /proc/mounts || mount -t debugfs none /sys/kernel/debug 2>/dev/null || true
+            # -a: system-wide  -A: per-CPU (no aggregation)  -I: interval in ms
+            # -x,: CSV output for easier parsing
+            # Events (work on both Intel and AMD via generic hw aliases):
+            #   cycles, instructions            → IPC
+            #   cache-misses                    → L2/L3 cache misses
+            #   stalled-cycles-backend          → backend stall % (memory, TLB, exec units)
+            #   stalled-cycles-frontend         → frontend stall % (fetch, decode)
+            /usr/bin/perf stat -a -A -I "$((interval * 1000))" -x , \
+                -e cycles,instructions,cache-misses,stalled-cycles-backend,stalled-cycles-frontend \
+                > perf-stat-stdout.txt 2>&1 &
+            perf_stat_pid=$!
+            echo "perf-stat pid is $perf_stat_pid"
+            echo "$perf_stat_pid" >>kerneltools-pids.txt
             ;;
         intel-speed-select)
             echo "invoking intel-speed-select"
