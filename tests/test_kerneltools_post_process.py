@@ -34,7 +34,7 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
         {
             "function": "do_work",
             "cpu": "0",
-            "command": "cmd",
+            "cmd": "cmd",
             "package": "1",
             "die": "2",
             "core": "3",
@@ -46,7 +46,7 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
         {
             "function": "do_work",
             "cpu": "1",
-            "command": "cmd",
+            "cmd": "cmd",
             "package": "1",
             "die": "2",
             "core": "3",
@@ -58,7 +58,7 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
         {
             "function": "do_work",
             "cpu": "1",
-            "command": "other-cmd",
+            "cmd": "other-cmd",
             "package": "1",
             "die": "2",
             "core": "3",
@@ -70,7 +70,7 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
         {
             "function": "other_work",
             "cpu": "0",
-            "command": "cmd",
+            "cmd": "cmd",
             "package": "1",
             "die": "2",
             "core": "3",
@@ -82,7 +82,7 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
         {
             "function": "other_work",
             "cpu": "0",
-            "command": "cmd",
+            "cmd": "cmd",
             "package": "1",
             "die": "2",
             "core": "3",
@@ -94,7 +94,7 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
         {
             "function": "schedule",
             "cpu": "0",
-            "command": "cmd",
+            "cmd": "cmd",
             "package": "1",
             "die": "2",
             "core": "3",
@@ -106,7 +106,7 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
         {
             "function": "do_work",
             "cpu": "0",
-            "command": "cmd",
+            "cmd": "cmd",
             "package": "1",
             "die": "2",
             "core": "3",
@@ -118,7 +118,7 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
         {
             "function": "other_work",
             "cpu": "0",
-            "command": "cmd",
+            "cmd": "cmd",
             "package": "1",
             "die": "2",
             "core": "3",
@@ -158,7 +158,7 @@ def test_parse_perf_report_uses_raw_period_for_precision():
         {
             "function": "common_function",
             "cpu": "0",
-            "command": "cmd",
+            "cmd": "cmd",
             "package": "1",
             "die": "2",
             "core": "3",
@@ -170,7 +170,7 @@ def test_parse_perf_report_uses_raw_period_for_precision():
         {
             "function": "rare_function",
             "cpu": "0",
-            "command": "cmd",
+            "cmd": "cmd",
             "package": "1",
             "die": "2",
             "core": "3",
@@ -225,7 +225,7 @@ def test_emit_perf_samples_uses_expected_metric_descriptor_and_breakout():
         {
             "function": "do_work",
             "cpu": "0",
-            "command": "cmd",
+            "cmd": "cmd",
             "package": "1",
             "die": "2",
             "core": "3",
@@ -237,7 +237,7 @@ def test_emit_perf_samples_uses_expected_metric_descriptor_and_breakout():
         {
             "function": "do_work",
             "cpu": "0",
-            "command": "cmd",
+            "cmd": "cmd",
             "package": "1",
             "die": "2",
             "core": "3",
@@ -263,7 +263,7 @@ def test_emit_perf_samples_uses_expected_metric_descriptor_and_breakout():
             {
                 "function": "do_work",
                 "cpu": "0",
-                "command": "cmd",
+                "cmd": "cmd",
                 "package": "1",
                 "die": "2",
                 "core": "3",

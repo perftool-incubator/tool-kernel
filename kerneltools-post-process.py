@@ -148,7 +148,7 @@ def _parse_perf_report(
             {
                 "function": function,
                 "cpu": cpu,
-                "command": command,
+                "cmd": command,
                 "package": str(topology["package_id"]) if "package_id" in topology else None,
                 "die": str(topology["die_id"]) if "die_id" in topology else None,
                 "core": str(topology["core_id"]) if "core_id" in topology else None,
@@ -173,9 +173,9 @@ def _emit_perf_samples(samples: list[dict[str, object]], metrics) -> None:
     for sample in samples:
         function = str(sample["function"])
         cpu = str(sample["cpu"])
-        command = str(sample["command"])
+        command = str(sample["cmd"])
         cache_key = (function, cpu, command)
-        names = {"function": function, "cpu": cpu, "command": command}
+        names = {"function": function, "cpu": cpu, "cmd": command}
         for breakout in ("package", "die", "core", "thread"):
             if sample.get(breakout) is not None:
                 names[breakout] = str(sample[breakout])
