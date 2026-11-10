@@ -7,16 +7,19 @@ from __future__ import annotations
 import os
 import re
 import sys
+from collections.abc import Iterable
 from pathlib import Path
 
 TOOLBOX_HOME = os.environ.get("TOOLBOX_HOME")
 if TOOLBOX_HOME:
     sys.path.append(str(Path(TOOLBOX_HOME) / "python"))
 
-from toolbox.cdm_metrics import CDMMetrics
-from toolbox.fileio import open_read_text_file
-
-SOURCE = "turbostat"
+TURBOSTAT_SOURCE = "turbostat"
+PERF_SOURCE = "perf-record"
+PERF_METRIC_TYPE = "overhead-pct"
+PERF_REPORT_BASENAME = "perf-report.csv"
+PERF_BOOT_TIME_FILE = "kerneltools-boot-time.txt"
+PERF_TIME_QUANTUM_MS = 1000
 
 
 def _safe_float(fields: list[str], col_idx: dict[str, int], name: str) -> float | None:
@@ -29,8 +32,122 @@ def _safe_float(fields: list[str], col_idx: dict[str, int], name: str) -> float 
         return None
 
 
+def _clean_perf_symbol(raw_symbol: str) -> str | None:
+    symbol = raw_symbol.strip()
+    if symbol in ("", "-"):
+        return None
+
+    # perf decorates symbols with their execution domain. The first pass keeps
+    # the symbol itself as the function breakout and leaves domain breakouts
+    # for a later change.
+    for prefix in ("[.] ", "[k] ", "[g] ", "[guest] ", "[kernel.kallsyms] "):
+        if symbol.startswith(prefix):
+            symbol = symbol[len(prefix):].strip()
+            break
+
+    return symbol or None
+
+
+def _parse_percentage(fields: list[str], col_idx: dict[str, int], name: str) -> float | None:
+    idx = col_idx.get(name)
+    if idx is None or idx >= len(fields):
+        return None
+    try:
+        return float(fields[idx].rstrip("%").strip())
+    except ValueError:
+        return None
+
+
+def _perf_bucket_begin_ms(boot_time_s: int, perf_time_s: float) -> int:
+    perf_time_ms = int(perf_time_s * 1000)
+    bucket_offset_ms = (perf_time_ms // PERF_TIME_QUANTUM_MS) * PERF_TIME_QUANTUM_MS
+    return boot_time_s * 1000 + bucket_offset_ms
+
+
+def _parse_perf_report(lines: Iterable[str], boot_time_s: int) -> list[dict[str, object]]:
+    col_idx: dict[str, int] = {}
+    buckets: dict[tuple[int, str], float] = {}
+
+    for raw_line in lines:
+        line = raw_line.rstrip("\n")
+        stripped = line.lstrip()
+
+        if not stripped:
+            continue
+
+        if stripped.startswith("#"):
+            if stripped.startswith("# Overhead"):
+                cols = stripped.lstrip("#").split(",")
+                col_idx = {col.strip(): i for i, col in enumerate(cols)}
+            continue
+
+        if not col_idx:
+            continue
+
+        fields = [field.strip() for field in line.split(",")]
+        overhead = _parse_percentage(fields, col_idx, "Overhead")
+        perf_time = _safe_float(fields, col_idx, "Time")
+        symbol_idx = col_idx.get("Symbol")
+        if overhead is None or perf_time is None or symbol_idx is None or symbol_idx >= len(fields):
+            continue
+
+        function = _clean_perf_symbol(fields[symbol_idx])
+        if function is None:
+            continue
+
+        begin_ms = _perf_bucket_begin_ms(boot_time_s, perf_time)
+        bucket_key = (begin_ms, function)
+        buckets[bucket_key] = buckets.get(bucket_key, 0.0) + overhead / 100.0
+
+    samples: list[dict[str, object]] = []
+    for (begin_ms, function), value in sorted(buckets.items()):
+        samples.append(
+            {
+                "function": function,
+                "begin": begin_ms,
+                "end": begin_ms + PERF_TIME_QUANTUM_MS - 1,
+                "value": value,
+            }
+        )
+    return samples
+
+
+def _emit_perf_samples(samples: list[dict[str, object]], metrics) -> None:
+    desc = {
+        "source": PERF_SOURCE,
+        "class": "percentage",
+        "type": PERF_METRIC_TYPE,
+        "default-aggregation": "sum",
+    }
+    metric_idx_cache: dict[str, int] = {}
+
+    for sample in samples:
+        function = str(sample["function"])
+        names = {"function": function}
+        metric_sample = {
+            "begin": sample["begin"],
+            "end": sample["end"],
+            "value": sample["value"],
+        }
+
+        if function in metric_idx_cache:
+            metrics.log_sample_by_idx(
+                metric_idx_cache[function],
+                metric_sample["value"],
+                metric_sample["end"],
+                metric_sample["begin"],
+            )
+        else:
+            metric_idx_cache[function] = metrics.log_sample(
+                PERF_SOURCE, desc, names, metric_sample
+            )
+
+
 def process_turbostat(log_file: str) -> None:
     print(f"Post-processing turbostat: {log_file}")
+    from toolbox.cdm_metrics import CDMMetrics
+    from toolbox.fileio import open_read_text_file
+
     metrics = CDMMetrics()
     metric_idx_cache: dict[tuple, int] = {}
 
@@ -86,8 +203,8 @@ def process_turbostat(log_file: str) -> None:
                     if cache_key in metric_idx_cache:
                         metrics.log_sample_by_idx(metric_idx_cache[cache_key], val, ts_ms)
                     else:
-                        desc = {"source": SOURCE, "class": cdm_class, "type": metric_type, "default-aggregation": default_agg}
-                        idx = metrics.log_sample(SOURCE, desc, {}, {**sample_base, "value": val})
+                        desc = {"source": TURBOSTAT_SOURCE, "class": cdm_class, "type": metric_type, "default-aggregation": default_agg}
+                        idx = metrics.log_sample(TURBOSTAT_SOURCE, desc, {}, {**sample_base, "value": val})
                         metric_idx_cache[cache_key] = idx
 
         elif cpu_field not in ("-", ""):
@@ -112,13 +229,45 @@ def process_turbostat(log_file: str) -> None:
                     if cache_key in metric_idx_cache:
                         metrics.log_sample_by_idx(metric_idx_cache[cache_key], val, ts_ms)
                     else:
-                        desc = {"source": SOURCE, "class": cdm_class, "type": metric_type, "default-aggregation": default_agg}
-                        idx = metrics.log_sample(SOURCE, desc, names, {**sample_base, "value": val})
+                        desc = {"source": TURBOSTAT_SOURCE, "class": cdm_class, "type": metric_type, "default-aggregation": default_agg}
+                        idx = metrics.log_sample(TURBOSTAT_SOURCE, desc, names, {**sample_base, "value": val})
                         metric_idx_cache[cache_key] = idx
 
     fh.close()
     metrics.finish_samples()
     print("Post-processing for turbostat complete")
+
+
+def process_perf_report(report_file: str, boot_time_file: str) -> None:
+    print(f"Post-processing perf-record: {report_file}")
+    from toolbox.cdm_metrics import CDMMetrics
+    from toolbox.fileio import open_read_text_file
+
+    try:
+        boot_time_s = int(Path(boot_time_file).read_text().strip())
+    except (FileNotFoundError, ValueError):
+        print(f"ERROR: could not read a valid boot time from {boot_time_file}")
+        return
+
+    try:
+        fh, _ = open_read_text_file(report_file)
+    except FileNotFoundError:
+        print(f"ERROR: could not open {report_file}")
+        return
+
+    try:
+        samples = _parse_perf_report(fh, boot_time_s)
+    finally:
+        fh.close()
+
+    if not samples:
+        print("WARNING: no perf-report samples found")
+        return
+
+    metrics = CDMMetrics()
+    _emit_perf_samples(samples, metrics)
+    metrics.finish_samples()
+    print(f"Post-processing for perf-record complete ({len(samples)} function buckets)")
 
 
 def main() -> None:
@@ -138,6 +287,18 @@ def main() -> None:
         print("WARNING: no turbostat-stdout.txt file found — skipping")
     else:
         process_turbostat(turbostat_files[0])
+
+    perf_report_files = [
+        f for f in files
+        if re.match(rf"^{re.escape(PERF_REPORT_BASENAME)}(\.xz)?$", f)
+    ]
+
+    if len(perf_report_files) > 1:
+        print(f"ERROR: multiple perf report files found: {perf_report_files}")
+    elif not perf_report_files:
+        print("WARNING: no perf-report.csv file found — skipping")
+    else:
+        process_perf_report(perf_report_files[0], PERF_BOOT_TIME_FILE)
 
     print("kerneltools post-processing complete")
 

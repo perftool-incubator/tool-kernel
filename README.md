@@ -29,9 +29,31 @@ The start script accepts these parameters:
 - `--sysfs-trace-cleanup <cmd>` — Cleanup commands for sysfs-trace (repeatable)
 
 The stop script additionally accepts:
-- `--perf-gen-local-report <ON|OFF>` — Generate a local `perf-report.txt` alongside the archived `perf.data` (default: `OFF`). `kerneltools-stop` itself takes this as a no-argument flag; `rickshaw.json`'s `param_regex` rewrites `ON` to the bare flag and drops `OFF` (and its value) entirely before the script ever sees it -- mirroring the same ON/OFF-fixup convention used by bench-trafficgen for its own no-argument flags.
+- `--perf-gen-local-report <ON|OFF>` — Generate an additional human-readable `perf-report.txt` alongside the archived `perf.data` (default: `OFF`). `kerneltools-stop` itself takes this as a no-argument flag; `rickshaw.json`'s `param_regex` rewrites `ON` to the bare flag and drops `OFF` (and its value) entirely before the script ever sees it -- mirroring the same ON/OFF-fixup convention used by bench-trafficgen for its own no-argument flags.
 - `--sysfs-trace-collection <system|per-cpu>` — Trace buffer collection mode (default: `per-cpu`)
+
+### Perf CDM metrics
+
+When the `perf` subtool is enabled, `kerneltools-start` records the collector's
+boot time in `kerneltools-boot-time.txt`. At stop time, after `perf archive`
+and before compressing `perf.data`, `kerneltools-stop` generates
+`perf-report.csv.xz` with one-second time buckets.
+
+The controller post-processor converts each symbol's overhead in each bucket
+into a CDM sample:
+
+- source: `perf-record`
+- type: `overhead-pct`
+- class: `percentage`
+- default aggregation: `sum`
+- breakout: `function`
+- value: overhead percentage normalized to a fraction, so `2.92%` becomes `0.0292`
+
+The first implementation intentionally breaks out only by function. Rows for
+the same function in the same time bucket are summed. If a function does not
+appear in a bucket, no sample is emitted for that function in that bucket;
+gaps are not zero-filled.
 
 ## Integration
 
-Kerneltools runs as a profiler tool on endpoint nodes. It is allowed on profiler, master, and worker collector roles but blocked on client and server roles. Data compression and post-processing (perf archive, trace-cmd reports) happens at stop time. The CDM post-processor (`kerneltools-post-process.py`) converts turbostat output into crucible's canonical metric format; other subtools are unaffected.
+Kerneltools runs as a profiler tool on endpoint nodes. It is allowed on profiler, master, and worker collector roles but blocked on client and server roles. Data compression and report generation (perf archive, perf reports, trace-cmd reports) happens at stop time. The CDM post-processor (`kerneltools-post-process.py`) converts turbostat and perf-record output into crucible's canonical metric format; other subtools are unaffected.

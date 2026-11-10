@@ -11,8 +11,8 @@ Wrapper scripts for Linux kernel profiling tools (perf, turbostat, intel-speed-s
 | File | Purpose |
 |------|---------|
 | `kerneltools-start` | Launches configured subtools with parameters for interval, recording options, frequencies |
-| `kerneltools-stop` | Kills collectors, generates perf archives, trace-cmd reports, compresses output with xz |
-| `kerneltools-post-process.py` | CDM post-processor for turbostat output |
+| `kerneltools-stop` | Kills collectors, generates perf archives and reports, trace-cmd reports, compresses output with xz |
+| `kerneltools-post-process.py` | CDM post-processor for turbostat and perf-record output |
 | `boot_to_epoch.py` | Converts between boot time and Unix epoch for perf time filtering |
 | `rickshaw.json` | Rickshaw integration: endpoint allow/block lists, file deployment, post-process script |
 | `workshop.json` | Engine image build: distro packages and kernel source compilation for perf/turbostat |
@@ -30,4 +30,9 @@ Wrapper scripts for Linux kernel profiling tools (perf, turbostat, intel-speed-s
 - Primary branch is `master`
 - Runs as a profiler tool on master/worker/profiler roles, blocked on client/server
 - Standard Bash modelines and 4-space indentation
-- CDM post-processing via `kerneltools-post-process.py` (turbostat metrics)
+- CDM post-processing via `kerneltools-post-process.py` (turbostat and perf-record metrics)
+- Perf CDM metrics use source `perf-record`, type `overhead-pct`, and a
+  `function` breakout. The collector persists boot time at start, generates a
+  one-second perf report at stop, and the controller normalizes each symbol's
+  overhead percentage to a fraction. Missing function buckets are omitted
+  rather than zero-filled.

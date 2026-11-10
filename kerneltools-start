@@ -88,8 +88,9 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
             echo "Starting perf record"
             mkdir -p ~/.debug
             cmd="/usr/bin/perf record -a $record_opts"
-            time=$(date -u --date="$(TZ=UTC uptime -s)" +%s)
-            echo "uptime as seconds since epoch: $time"
+            boot_time=$(date -u --date="$(TZ=UTC uptime -s)" +%s)
+            printf '%s\n' "$boot_time" >kerneltools-boot-time.txt
+            echo "uptime as seconds since epoch: $boot_time"
             echo "Going to run $cmd"
             $cmd &
             perf_pid=$!
