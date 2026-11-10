@@ -39,20 +39,22 @@ boot time in `kerneltools-boot-time.txt`. At stop time, after `perf archive`
 and before compressing `perf.data`, `kerneltools-stop` generates
 `perf-report.csv.xz` with one-second time buckets.
 
-The controller post-processor converts each symbol's overhead in each bucket
-into a CDM sample:
+The controller post-processor converts each symbol's sampled event period in
+each bucket into a CDM sample:
 
 - source: `perf-record`
-- type: `overhead-pct`
-- class: `percentage`
+- type: `cpu-cycles-spent`
+- class: `count`
 - default aggregation: `sum`
-- breakout: `function`
-- value: overhead percentage normalized to a fraction, so `2.92%` becomes `0.0292`
+- breakouts: `function`, `cpu`
+- value: the sum of the raw event `Period` values for that function and CPU,
+  avoiding the two-decimal precision loss in perf's displayed `Overhead` column
 
-The first implementation intentionally breaks out only by function. Rows for
-the same function in the same time bucket are summed. If a function does not
-appear in a bucket, no sample is emitted for that function in that bucket;
-gaps are not zero-filled.
+For the default cycles event, this represents sampled CPU cycles spent in the
+function on that CPU; it is not wall-clock or CPU time unless event frequency
+is known. Rows for the same function, CPU, and time bucket are summed. If a
+function and CPU combination does not appear in a bucket, no sample is emitted
+for that combination in that bucket; gaps are not zero-filled.
 
 ## Integration
 

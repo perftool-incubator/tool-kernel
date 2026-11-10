@@ -38,7 +38,7 @@
         {
           "source": "perf-record",
           "types": [
-            "overhead-pct"
+            "cpu-cycles-spent"
           ]
         }
       ],

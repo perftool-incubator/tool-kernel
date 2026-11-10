@@ -16,7 +16,7 @@ if TOOLBOX_HOME:
 
 TURBOSTAT_SOURCE = "turbostat"
 PERF_SOURCE = "perf-record"
-PERF_METRIC_TYPE = "overhead-pct"
+PERF_METRIC_TYPE = "cpu-cycles-spent"
 PERF_REPORT_BASENAME = "perf-report.csv"
 PERF_BOOT_TIME_FILE = "kerneltools-boot-time.txt"
 PERF_TIME_QUANTUM_MS = 1000
@@ -48,12 +48,12 @@ def _clean_perf_symbol(raw_symbol: str) -> str | None:
     return symbol or None
 
 
-def _parse_percentage(fields: list[str], col_idx: dict[str, int], name: str) -> float | None:
+def _safe_int(fields: list[str], col_idx: dict[str, int], name: str) -> int | None:
     idx = col_idx.get(name)
     if idx is None or idx >= len(fields):
         return None
     try:
-        return float(fields[idx].rstrip("%").strip())
+        return int(fields[idx])
     except ValueError:
         return None
 
@@ -66,7 +66,7 @@ def _perf_bucket_begin_ms(boot_time_s: int, perf_time_s: float) -> int:
 
 def _parse_perf_report(lines: Iterable[str], boot_time_s: int) -> list[dict[str, object]]:
     col_idx: dict[str, int] = {}
-    buckets: dict[tuple[int, str], float] = {}
+    periods: dict[tuple[int, str, str], int] = {}
 
     for raw_line in lines:
         line = raw_line.rstrip("\n")
@@ -85,25 +85,38 @@ def _parse_perf_report(lines: Iterable[str], boot_time_s: int) -> list[dict[str,
             continue
 
         fields = [field.strip() for field in line.split(",")]
-        overhead = _parse_percentage(fields, col_idx, "Overhead")
+        period = _safe_int(fields, col_idx, "Period")
         perf_time = _safe_float(fields, col_idx, "Time")
+        cpu_idx = col_idx.get("CPU")
         symbol_idx = col_idx.get("Symbol")
-        if overhead is None or perf_time is None or symbol_idx is None or symbol_idx >= len(fields):
+        if (
+            period is None
+            or period < 0
+            or perf_time is None
+            or cpu_idx is None
+            or cpu_idx >= len(fields)
+            or symbol_idx is None
+            or symbol_idx >= len(fields)
+        ):
             continue
 
         function = _clean_perf_symbol(fields[symbol_idx])
         if function is None:
             continue
+        cpu = fields[cpu_idx]
+        if not cpu:
+            continue
 
         begin_ms = _perf_bucket_begin_ms(boot_time_s, perf_time)
-        bucket_key = (begin_ms, function)
-        buckets[bucket_key] = buckets.get(bucket_key, 0.0) + overhead / 100.0
+        bucket_key = (begin_ms, function, cpu)
+        periods[bucket_key] = periods.get(bucket_key, 0) + period
 
     samples: list[dict[str, object]] = []
-    for (begin_ms, function), value in sorted(buckets.items()):
+    for (begin_ms, function, cpu), value in sorted(periods.items()):
         samples.append(
             {
                 "function": function,
+                "cpu": cpu,
                 "begin": begin_ms,
                 "end": begin_ms + PERF_TIME_QUANTUM_MS - 1,
                 "value": value,
@@ -115,30 +128,32 @@ def _parse_perf_report(lines: Iterable[str], boot_time_s: int) -> list[dict[str,
 def _emit_perf_samples(samples: list[dict[str, object]], metrics) -> None:
     desc = {
         "source": PERF_SOURCE,
-        "class": "percentage",
+        "class": "count",
         "type": PERF_METRIC_TYPE,
         "default-aggregation": "sum",
     }
-    metric_idx_cache: dict[str, int] = {}
+    metric_idx_cache: dict[tuple[str, str], int] = {}
 
     for sample in samples:
         function = str(sample["function"])
-        names = {"function": function}
+        cpu = str(sample["cpu"])
+        cache_key = (function, cpu)
+        names = {"function": function, "cpu": cpu}
         metric_sample = {
             "begin": sample["begin"],
             "end": sample["end"],
             "value": sample["value"],
         }
 
-        if function in metric_idx_cache:
+        if cache_key in metric_idx_cache:
             metrics.log_sample_by_idx(
-                metric_idx_cache[function],
+                metric_idx_cache[cache_key],
                 metric_sample["value"],
                 metric_sample["end"],
                 metric_sample["begin"],
             )
         else:
-            metric_idx_cache[function] = metrics.log_sample(
+            metric_idx_cache[cache_key] = metrics.log_sample(
                 PERF_SOURCE, desc, names, metric_sample
             )
 
