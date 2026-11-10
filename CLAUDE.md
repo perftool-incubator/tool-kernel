@@ -36,4 +36,4 @@ Wrapper scripts for Linux kernel profiling tools (perf, turbostat, intel-speed-s
   breakouts. The collector persists boot time and captures sysfs CPU topology
   at start in `kerneltools-cpu-topology.txt`, generates a one-second perf report
   at stop, and the controller sums raw event periods. Missing
-  function/CPU/command buckets are omitted rather than zero-filled.
+  function/CPU/cmd buckets are omitted rather than zero-filled.
