@@ -66,7 +66,7 @@ def _perf_bucket_begin_ms(boot_time_s: int, perf_time_s: float) -> int:
 
 def _parse_perf_report(lines: Iterable[str], boot_time_s: int) -> list[dict[str, object]]:
     col_idx: dict[str, int] = {}
-    periods: dict[tuple[int, str, str], int] = {}
+    periods: dict[tuple[int, str, str, str], int] = {}
 
     for raw_line in lines:
         line = raw_line.rstrip("\n")
@@ -88,6 +88,7 @@ def _parse_perf_report(lines: Iterable[str], boot_time_s: int) -> list[dict[str,
         period = _safe_int(fields, col_idx, "Period")
         perf_time = _safe_float(fields, col_idx, "Time")
         cpu_idx = col_idx.get("CPU")
+        command_idx = col_idx.get("Command")
         symbol_idx = col_idx.get("Symbol")
         if (
             period is None
@@ -95,6 +96,8 @@ def _parse_perf_report(lines: Iterable[str], boot_time_s: int) -> list[dict[str,
             or perf_time is None
             or cpu_idx is None
             or cpu_idx >= len(fields)
+            or command_idx is None
+            or command_idx >= len(fields)
             or symbol_idx is None
             or symbol_idx >= len(fields)
         ):
@@ -104,19 +107,21 @@ def _parse_perf_report(lines: Iterable[str], boot_time_s: int) -> list[dict[str,
         if function is None:
             continue
         cpu = fields[cpu_idx]
-        if not cpu:
+        command = fields[command_idx]
+        if not cpu or not command:
             continue
 
         begin_ms = _perf_bucket_begin_ms(boot_time_s, perf_time)
-        bucket_key = (begin_ms, function, cpu)
+        bucket_key = (begin_ms, function, cpu, command)
         periods[bucket_key] = periods.get(bucket_key, 0) + period
 
     samples: list[dict[str, object]] = []
-    for (begin_ms, function, cpu), value in sorted(periods.items()):
+    for (begin_ms, function, cpu, command), value in sorted(periods.items()):
         samples.append(
             {
                 "function": function,
                 "cpu": cpu,
+                "command": command,
                 "begin": begin_ms,
                 "end": begin_ms + PERF_TIME_QUANTUM_MS - 1,
                 "value": value,
@@ -132,13 +137,14 @@ def _emit_perf_samples(samples: list[dict[str, object]], metrics) -> None:
         "type": PERF_METRIC_TYPE,
         "default-aggregation": "sum",
     }
-    metric_idx_cache: dict[tuple[str, str], int] = {}
+    metric_idx_cache: dict[tuple[str, str, str], int] = {}
 
     for sample in samples:
         function = str(sample["function"])
         cpu = str(sample["cpu"])
-        cache_key = (function, cpu)
-        names = {"function": function, "cpu": cpu}
+        command = str(sample["command"])
+        cache_key = (function, cpu, command)
+        names = {"function": function, "cpu": cpu, "command": command}
         metric_sample = {
             "begin": sample["begin"],
             "end": sample["end"],

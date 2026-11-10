@@ -10,11 +10,12 @@ MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
 
-def test_parse_perf_report_aggregates_by_function_and_cpu():
+def test_parse_perf_report_aggregates_by_function_cpu_and_command():
     lines = [
         "# Overhead,Period,Samples,Time,CPU,Command,Symbol,IPC [IPC Coverage]",
         " 20.00%,100,1,1.0000,0,cmd,[.] do_work,-      -",
         " 30.00%,150,1,1.0000,1,cmd,[.] do_work,-      -",
+        " 15.00%,75,1,1.0000,1,other-cmd,[.] do_work,-      -",
         " 10.00%,50,1,2.0000,0,cmd,[k] schedule,-      -",
         "  5.00%,25,1,3.0000,0,cmd,[.] do_work,-      -",
         " 80.00%,250,1,1.0000,0,cmd,[.] other_work,-      -",
@@ -28,6 +29,7 @@ def test_parse_perf_report_aggregates_by_function_and_cpu():
         {
             "function": "do_work",
             "cpu": "0",
+            "command": "cmd",
             "begin": 1700000001000,
             "end": 1700000001999,
             "value": 100,
@@ -35,13 +37,23 @@ def test_parse_perf_report_aggregates_by_function_and_cpu():
         {
             "function": "do_work",
             "cpu": "1",
+            "command": "cmd",
             "begin": 1700000001000,
             "end": 1700000001999,
             "value": 150,
         },
         {
+            "function": "do_work",
+            "cpu": "1",
+            "command": "other-cmd",
+            "begin": 1700000001000,
+            "end": 1700000001999,
+            "value": 75,
+        },
+        {
             "function": "other_work",
             "cpu": "0",
+            "command": "cmd",
             "begin": 1700000001000,
             "end": 1700000001999,
             "value": 250,
@@ -49,6 +61,7 @@ def test_parse_perf_report_aggregates_by_function_and_cpu():
         {
             "function": "other_work",
             "cpu": "0",
+            "command": "cmd",
             "begin": 1700000002000,
             "end": 1700000002999,
             "value": 450,
@@ -56,6 +69,7 @@ def test_parse_perf_report_aggregates_by_function_and_cpu():
         {
             "function": "schedule",
             "cpu": "0",
+            "command": "cmd",
             "begin": 1700000002000,
             "end": 1700000002999,
             "value": 50,
@@ -63,6 +77,7 @@ def test_parse_perf_report_aggregates_by_function_and_cpu():
         {
             "function": "do_work",
             "cpu": "0",
+            "command": "cmd",
             "begin": 1700000003000,
             "end": 1700000003999,
             "value": 25,
@@ -70,6 +85,7 @@ def test_parse_perf_report_aggregates_by_function_and_cpu():
         {
             "function": "other_work",
             "cpu": "0",
+            "command": "cmd",
             "begin": 1700000003000,
             "end": 1700000003999,
             "value": 475,
@@ -77,7 +93,7 @@ def test_parse_perf_report_aggregates_by_function_and_cpu():
     ]
 
 
-def test_parse_perf_report_preserves_function_cpu_gaps():
+def test_parse_perf_report_preserves_function_cpu_command_gaps():
     lines = [
         "# Overhead,Period,Samples,Time,CPU,Command,Symbol",
         " 10.00%,100,1,1.0000,0,cmd,[.] one",
@@ -105,6 +121,7 @@ def test_parse_perf_report_uses_raw_period_for_precision():
         {
             "function": "common_function",
             "cpu": "0",
+            "command": "cmd",
             "begin": 1000,
             "end": 1999,
             "value": 999999,
@@ -112,6 +129,7 @@ def test_parse_perf_report_uses_raw_period_for_precision():
         {
             "function": "rare_function",
             "cpu": "0",
+            "command": "cmd",
             "begin": 1000,
             "end": 1999,
             "value": 1,
@@ -149,6 +167,7 @@ def test_emit_perf_samples_uses_expected_metric_descriptor_and_breakout():
         {
             "function": "do_work",
             "cpu": "0",
+            "command": "cmd",
             "begin": 1000,
             "end": 1999,
             "value": 250,
@@ -156,6 +175,7 @@ def test_emit_perf_samples_uses_expected_metric_descriptor_and_breakout():
         {
             "function": "do_work",
             "cpu": "0",
+            "command": "cmd",
             "begin": 3000,
             "end": 3999,
             "value": 500,
@@ -174,7 +194,7 @@ def test_emit_perf_samples_uses_expected_metric_descriptor_and_breakout():
                 "type": "cpu-cycles-spent",
                 "default-aggregation": "sum",
             },
-            {"function": "do_work", "cpu": "0"},
+            {"function": "do_work", "cpu": "0", "command": "cmd"},
             {"begin": 1000, "end": 1999, "value": 250},
         )
     ]
