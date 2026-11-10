@@ -19,6 +19,7 @@ PERF_SOURCE = "perf-record"
 PERF_METRIC_TYPE = "cpu-cycles-spent"
 PERF_REPORT_BASENAME = "perf-report.csv"
 PERF_BOOT_TIME_FILE = "kerneltools-boot-time.txt"
+PERF_CPU_TOPOLOGY_FILE = "kerneltools-cpu-topology.txt"
 PERF_TIME_QUANTUM_MS = 1000
 
 
@@ -64,7 +65,28 @@ def _perf_bucket_begin_ms(boot_time_s: int, perf_time_s: float) -> int:
     return boot_time_s * 1000 + bucket_offset_ms
 
 
-def _parse_perf_report(lines: Iterable[str], boot_time_s: int) -> list[dict[str, object]]:
+def _parse_cpu_topology(lines: Iterable[str]) -> dict[int, dict[str, int]]:
+    topology: dict[int, dict[str, int]] = {}
+    pattern = re.compile(
+        r"^cpu=(\d+) package=(\d+) die=(\d+) core=(\d+) thread=(\d+)$"
+    )
+    for raw_line in lines:
+        match = pattern.match(raw_line.strip())
+        if not match:
+            continue
+        cpu, package, die, core, thread = map(int, match.groups())
+        topology[cpu] = {
+            "package_id": package,
+            "die_id": die,
+            "core_id": core,
+            "thread_id": thread,
+        }
+    return topology
+
+
+def _parse_perf_report(
+    lines: Iterable[str], boot_time_s: int, cpu_topology: dict[int, dict[str, int]] | None = None
+) -> list[dict[str, object]]:
     col_idx: dict[str, int] = {}
     periods: dict[tuple[int, str, str, str], int] = {}
 
@@ -110,6 +132,10 @@ def _parse_perf_report(lines: Iterable[str], boot_time_s: int) -> list[dict[str,
         command = fields[command_idx]
         if not cpu or not command:
             continue
+        try:
+            cpu = str(int(cpu))
+        except ValueError:
+            continue
 
         begin_ms = _perf_bucket_begin_ms(boot_time_s, perf_time)
         bucket_key = (begin_ms, function, cpu, command)
@@ -117,11 +143,16 @@ def _parse_perf_report(lines: Iterable[str], boot_time_s: int) -> list[dict[str,
 
     samples: list[dict[str, object]] = []
     for (begin_ms, function, cpu, command), value in sorted(periods.items()):
+        topology = (cpu_topology or {}).get(int(cpu), {})
         samples.append(
             {
                 "function": function,
                 "cpu": cpu,
                 "command": command,
+                "package": str(topology["package_id"]) if "package_id" in topology else None,
+                "die": str(topology["die_id"]) if "die_id" in topology else None,
+                "core": str(topology["core_id"]) if "core_id" in topology else None,
+                "thread": str(topology["thread_id"]) if "thread_id" in topology else None,
                 "begin": begin_ms,
                 "end": begin_ms + PERF_TIME_QUANTUM_MS - 1,
                 "value": value,
@@ -145,6 +176,9 @@ def _emit_perf_samples(samples: list[dict[str, object]], metrics) -> None:
         command = str(sample["command"])
         cache_key = (function, cpu, command)
         names = {"function": function, "cpu": cpu, "command": command}
+        for breakout in ("package", "die", "core", "thread"):
+            if sample.get(breakout) is not None:
+                names[breakout] = str(sample[breakout])
         metric_sample = {
             "begin": sample["begin"],
             "end": sample["end"],
@@ -277,7 +311,13 @@ def process_perf_report(report_file: str, boot_time_file: str) -> None:
         return
 
     try:
-        samples = _parse_perf_report(fh, boot_time_s)
+        try:
+            with open(PERF_CPU_TOPOLOGY_FILE) as topology_fh:
+                cpu_topology = _parse_cpu_topology(topology_fh)
+        except FileNotFoundError:
+            print("WARNING: could not find CPU topology file; omitting topology breakouts")
+            cpu_topology = {}
+        samples = _parse_perf_report(fh, boot_time_s, cpu_topology)
     finally:
         fh.close()
 

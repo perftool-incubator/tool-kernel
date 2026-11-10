@@ -87,6 +87,44 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
         perf)
             echo "Starting perf record"
             mkdir -p ~/.debug
+            : >kerneltools-cpu-topology.txt
+            for cpu_path in /sys/devices/system/cpu/cpu[0-9]*; do
+                [ -d "$cpu_path" ] || continue
+                cpu=${cpu_path##*/}
+                cpu=${cpu#cpu}
+                online=$(cat "$cpu_path/online" 2>/dev/null)
+                [ "$online" = "1" ] || [ -z "$online" ] || continue
+                package=$(cat "$cpu_path/topology/physical_package_id" 2>/dev/null)
+                die=$(cat "$cpu_path/topology/die_id" 2>/dev/null)
+                core=$(cat "$cpu_path/topology/core_id" 2>/dev/null)
+                siblings=$(cat "$cpu_path/topology/thread_siblings_list" 2>/dev/null)
+                : "${package:=0}"
+                : "${die:=0}"
+                : "${core:=$cpu}"
+                thread=0
+                for sibling_group in ${siblings//,/ }; do
+                    case "$sibling_group" in
+                        *-*)
+                            sibling_start=${sibling_group%-*}
+                            sibling_end=${sibling_group#*-}
+                            if [ "$cpu" -ge "$sibling_start" ] && [ "$cpu" -le "$sibling_end" ]; then
+                                thread=$((cpu - sibling_start))
+                                break
+                            fi
+                            thread=$((thread + sibling_end - sibling_start + 1))
+                            ;;
+                        *)
+                            if [ "$sibling_group" = "$cpu" ]; then
+                                break
+                            fi
+                            thread=$((thread + 1))
+                            ;;
+                    esac
+                done
+                printf 'cpu=%s package=%s die=%s core=%s thread=%s\n' \
+                    "$cpu" "$package" "$die" "$core" "$thread" \
+                    >>kerneltools-cpu-topology.txt
+            done
             cmd="/usr/bin/perf record -a $record_opts"
             boot_time=$(date -u --date="$(TZ=UTC uptime -s)" +%s)
             printf '%s\n' "$boot_time" >kerneltools-boot-time.txt

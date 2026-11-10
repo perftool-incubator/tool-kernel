@@ -35,7 +35,8 @@ The stop script additionally accepts:
 ### Perf CDM metrics
 
 When the `perf` subtool is enabled, `kerneltools-start` records the collector's
-boot time in `kerneltools-boot-time.txt`. At stop time, after `perf archive`
+boot time in `kerneltools-boot-time.txt` and captures the collector's CPU
+topology in `kerneltools-cpu-topology.txt`. At stop time, after `perf archive`
 and before compressing `perf.data`, `kerneltools-stop` generates
 `perf-report.csv.xz` with one-second time buckets.
 
@@ -46,15 +47,17 @@ each bucket into a CDM sample:
 - type: `cpu-cycles-spent`
 - class: `count`
 - default aggregation: `sum`
-- breakouts: `function`, `cpu`, `command`
+- breakouts: `function`, `cpu`, `command`, `package`, `die`, `core`, `thread`
 - value: the sum of the raw event `Period` values for that function and CPU,
   avoiding the two-decimal precision loss in perf's displayed `Overhead` column
 
 For the default cycles event, this represents sampled CPU cycles spent in the
 function on that CPU; it is not wall-clock or CPU time unless event frequency
 is known. Rows for the same function, CPU, command, and time bucket are summed.
-If a function, CPU, and command combination does not appear in a bucket, no
-sample is emitted for that combination in that bucket; gaps are not zero-filled.
+The package, die, core, and thread labels come from the topology captured on
+the collection host. If a function, CPU, and command combination does not
+appear in a bucket, no sample is emitted for that combination in that bucket;
+gaps are not zero-filled.
 
 ## Integration
 

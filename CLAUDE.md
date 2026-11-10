@@ -32,7 +32,8 @@ Wrapper scripts for Linux kernel profiling tools (perf, turbostat, intel-speed-s
 - Standard Bash modelines and 4-space indentation
 - CDM post-processing via `kerneltools-post-process.py` (turbostat and perf-record metrics)
 - Perf CDM metrics use source `perf-record`, type `cpu-cycles-spent`, and
-  `function`, `cpu`, and `command` breakouts. The collector persists boot time
-  at start, generates a one-second perf report at stop, and the controller sums
-  raw event periods. Missing function/CPU/command buckets are omitted rather
-  than zero-filled.
+  `function`, `cpu`, `command`, `package`, `die`, `core`, and `thread`
+  breakouts. The collector persists boot time and captures sysfs CPU topology
+  at start in `kerneltools-cpu-topology.txt`, generates a one-second perf report
+  at stop, and the controller sums raw event periods. Missing
+  function/CPU/command buckets are omitted rather than zero-filled.

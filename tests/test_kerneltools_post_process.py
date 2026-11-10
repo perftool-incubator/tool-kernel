@@ -9,12 +9,17 @@ SPEC = importlib.util.spec_from_file_location("kerneltools_post_process", MODULE
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
+CPU_TOPOLOGY = {
+    0: {"package_id": 1, "die_id": 2, "core_id": 3, "thread_id": 0},
+    1: {"package_id": 1, "die_id": 2, "core_id": 3, "thread_id": 1},
+}
+
 
 def test_parse_perf_report_aggregates_by_function_cpu_and_command():
     lines = [
         "# Overhead,Period,Samples,Time,CPU,Command,Symbol,IPC [IPC Coverage]",
         " 20.00%,100,1,1.0000,0,cmd,[.] do_work,-      -",
-        " 30.00%,150,1,1.0000,1,cmd,[.] do_work,-      -",
+        " 30.00%,150,1,1.0000,001,cmd,[.] do_work,-      -",
         " 15.00%,75,1,1.0000,1,other-cmd,[.] do_work,-      -",
         " 10.00%,50,1,2.0000,0,cmd,[k] schedule,-      -",
         "  5.00%,25,1,3.0000,0,cmd,[.] do_work,-      -",
@@ -23,13 +28,17 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
         " 95.00%,475,1,3.0000,0,cmd,[.] other_work,-      -",
     ]
 
-    samples = MODULE._parse_perf_report(lines, 1700000000)
+    samples = MODULE._parse_perf_report(lines, 1700000000, CPU_TOPOLOGY)
 
     assert samples == [
         {
             "function": "do_work",
             "cpu": "0",
             "command": "cmd",
+            "package": "1",
+            "die": "2",
+            "core": "3",
+            "thread": "0",
             "begin": 1700000001000,
             "end": 1700000001999,
             "value": 100,
@@ -38,6 +47,10 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
             "function": "do_work",
             "cpu": "1",
             "command": "cmd",
+            "package": "1",
+            "die": "2",
+            "core": "3",
+            "thread": "1",
             "begin": 1700000001000,
             "end": 1700000001999,
             "value": 150,
@@ -46,6 +59,10 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
             "function": "do_work",
             "cpu": "1",
             "command": "other-cmd",
+            "package": "1",
+            "die": "2",
+            "core": "3",
+            "thread": "1",
             "begin": 1700000001000,
             "end": 1700000001999,
             "value": 75,
@@ -54,6 +71,10 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
             "function": "other_work",
             "cpu": "0",
             "command": "cmd",
+            "package": "1",
+            "die": "2",
+            "core": "3",
+            "thread": "0",
             "begin": 1700000001000,
             "end": 1700000001999,
             "value": 250,
@@ -62,6 +83,10 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
             "function": "other_work",
             "cpu": "0",
             "command": "cmd",
+            "package": "1",
+            "die": "2",
+            "core": "3",
+            "thread": "0",
             "begin": 1700000002000,
             "end": 1700000002999,
             "value": 450,
@@ -70,6 +95,10 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
             "function": "schedule",
             "cpu": "0",
             "command": "cmd",
+            "package": "1",
+            "die": "2",
+            "core": "3",
+            "thread": "0",
             "begin": 1700000002000,
             "end": 1700000002999,
             "value": 50,
@@ -78,6 +107,10 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
             "function": "do_work",
             "cpu": "0",
             "command": "cmd",
+            "package": "1",
+            "die": "2",
+            "core": "3",
+            "thread": "0",
             "begin": 1700000003000,
             "end": 1700000003999,
             "value": 25,
@@ -86,6 +119,10 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
             "function": "other_work",
             "cpu": "0",
             "command": "cmd",
+            "package": "1",
+            "die": "2",
+            "core": "3",
+            "thread": "0",
             "begin": 1700000003000,
             "end": 1700000003999,
             "value": 475,
@@ -100,7 +137,7 @@ def test_parse_perf_report_preserves_function_cpu_command_gaps():
         " 20.00%,200,1,3.0000,0,cmd,[.] one",
     ]
 
-    samples = MODULE._parse_perf_report(lines, 0)
+    samples = MODULE._parse_perf_report(lines, 0, CPU_TOPOLOGY)
 
     assert [(sample["begin"], sample["end"], sample["value"]) for sample in samples] == [
         (1000, 1999, 100),
@@ -115,13 +152,17 @@ def test_parse_perf_report_uses_raw_period_for_precision():
         " 0.00%,999999,1,1.0000,0,cmd,[.] common_function",
     ]
 
-    samples = MODULE._parse_perf_report(lines, 0)
+    samples = MODULE._parse_perf_report(lines, 0, CPU_TOPOLOGY)
 
     assert samples == [
         {
             "function": "common_function",
             "cpu": "0",
             "command": "cmd",
+            "package": "1",
+            "die": "2",
+            "core": "3",
+            "thread": "0",
             "begin": 1000,
             "end": 1999,
             "value": 999999,
@@ -130,6 +171,10 @@ def test_parse_perf_report_uses_raw_period_for_precision():
             "function": "rare_function",
             "cpu": "0",
             "command": "cmd",
+            "package": "1",
+            "die": "2",
+            "core": "3",
+            "thread": "0",
             "begin": 1000,
             "end": 1999,
             "value": 1,
@@ -143,6 +188,19 @@ def test_clean_perf_symbol_strips_execution_domain_markers():
     assert MODULE._clean_perf_symbol("[g] guest_func") == "guest_func"
     assert MODULE._clean_perf_symbol("[kernel.kallsyms] __x64_sys_read") == "__x64_sys_read"
     assert MODULE._clean_perf_symbol("-") is None
+
+
+def test_parse_cpu_topology_ignores_malformed_lines():
+    lines = [
+        "cpu=0 package=1 die=2 core=3 thread=0",
+        "not a topology line",
+        "cpu=001 package=1 die=2 core=3 thread=1",
+    ]
+
+    assert MODULE._parse_cpu_topology(lines) == {
+        0: {"package_id": 1, "die_id": 2, "core_id": 3, "thread_id": 0},
+        1: {"package_id": 1, "die_id": 2, "core_id": 3, "thread_id": 1},
+    }
 
 
 def test_perf_bucket_boundaries_do_not_round_across_a_second():
@@ -168,6 +226,10 @@ def test_emit_perf_samples_uses_expected_metric_descriptor_and_breakout():
             "function": "do_work",
             "cpu": "0",
             "command": "cmd",
+            "package": "1",
+            "die": "2",
+            "core": "3",
+            "thread": "0",
             "begin": 1000,
             "end": 1999,
             "value": 250,
@@ -176,6 +238,10 @@ def test_emit_perf_samples_uses_expected_metric_descriptor_and_breakout():
             "function": "do_work",
             "cpu": "0",
             "command": "cmd",
+            "package": "1",
+            "die": "2",
+            "core": "3",
+            "thread": "0",
             "begin": 3000,
             "end": 3999,
             "value": 500,
@@ -194,7 +260,15 @@ def test_emit_perf_samples_uses_expected_metric_descriptor_and_breakout():
                 "type": "cpu-cycles-spent",
                 "default-aggregation": "sum",
             },
-            {"function": "do_work", "cpu": "0", "command": "cmd"},
+            {
+                "function": "do_work",
+                "cpu": "0",
+                "command": "cmd",
+                "package": "1",
+                "die": "2",
+                "core": "3",
+                "thread": "0",
+            },
             {"begin": 1000, "end": 1999, "value": 250},
         )
     ]
