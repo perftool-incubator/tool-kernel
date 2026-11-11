@@ -13,10 +13,15 @@ CPU_TOPOLOGY = {
     0: {"package_id": 1, "die_id": 2, "core_id": 3, "thread_id": 0},
     1: {"package_id": 1, "die_id": 2, "core_id": 3, "thread_id": 1},
 }
+CYCLES_EVENT_HEADER = [
+    "# Samples: 1  of event 'cycles'",
+    "# Event count (approx.): 1",
+]
 
 
 def test_parse_perf_report_aggregates_by_function_cpu_and_command():
     lines = [
+        *CYCLES_EVENT_HEADER,
         "# Overhead,Period,Samples,Time,CPU,Command,Symbol,IPC [IPC Coverage]",
         " 20.00%,100,1,1.0000,0,cmd,[.] do_work,-      -",
         " 30.00%,150,1,1.0000,001,cmd,[.] do_work,-      -",
@@ -32,6 +37,7 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
 
     assert samples == [
         {
+            "metric_type": "cpu-cycles-spent",
             "function": "do_work",
             "cpu": "0",
             "cmd": "cmd",
@@ -44,6 +50,7 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
             "value": 100,
         },
         {
+            "metric_type": "cpu-cycles-spent",
             "function": "do_work",
             "cpu": "1",
             "cmd": "cmd",
@@ -56,6 +63,7 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
             "value": 150,
         },
         {
+            "metric_type": "cpu-cycles-spent",
             "function": "do_work",
             "cpu": "1",
             "cmd": "other-cmd",
@@ -68,6 +76,7 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
             "value": 75,
         },
         {
+            "metric_type": "cpu-cycles-spent",
             "function": "other_work",
             "cpu": "0",
             "cmd": "cmd",
@@ -80,6 +89,7 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
             "value": 250,
         },
         {
+            "metric_type": "cpu-cycles-spent",
             "function": "other_work",
             "cpu": "0",
             "cmd": "cmd",
@@ -92,6 +102,7 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
             "value": 450,
         },
         {
+            "metric_type": "cpu-cycles-spent",
             "function": "schedule",
             "cpu": "0",
             "cmd": "cmd",
@@ -104,6 +115,7 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
             "value": 50,
         },
         {
+            "metric_type": "cpu-cycles-spent",
             "function": "do_work",
             "cpu": "0",
             "cmd": "cmd",
@@ -116,6 +128,7 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
             "value": 25,
         },
         {
+            "metric_type": "cpu-cycles-spent",
             "function": "other_work",
             "cpu": "0",
             "cmd": "cmd",
@@ -132,6 +145,7 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
 
 def test_parse_perf_report_preserves_function_cpu_command_gaps():
     lines = [
+        *CYCLES_EVENT_HEADER,
         "# Overhead,Period,Samples,Time,CPU,Command,Symbol",
         " 10.00%,100,1,1.0000,0,cmd,[.] one",
         " 20.00%,200,1,3.0000,0,cmd,[.] one",
@@ -145,8 +159,45 @@ def test_parse_perf_report_preserves_function_cpu_command_gaps():
     ]
 
 
+def test_parse_perf_report_keeps_supported_event_types_separate():
+    lines = [
+        "# Samples: 1  of event 'cycles:u'",
+        "# Event count (approx.): 1",
+        "# Overhead,Period,Samples,Time,CPU,Command,Symbol",
+        " 50.00%,100,1,1.0000,0,cmd,[.] do_work",
+        "",
+        "# Samples: 1  of event 'instructions:k'",
+        "# Event count (approx.): 1",
+        "# Overhead,Period,Samples,Time,CPU,Command,Symbol",
+        " 50.00%,200,1,1.0000,0,cmd,[.] do_work",
+    ]
+
+    samples = MODULE._parse_perf_report(lines, 0, CPU_TOPOLOGY)
+
+    assert [(sample["metric_type"], sample["value"]) for sample in samples] == [
+        ("cpu-cycles-spent", 100),
+        ("cpu-instructions-spent", 200),
+    ]
+
+
+def test_parse_perf_report_skips_unsupported_event_types():
+    skipped_events = set()
+    lines = [
+        "# Samples: 1  of event 'task-clock'",
+        "# Event count (approx.): 1",
+        "# Overhead,Period,Samples,Time,CPU,Command,Symbol",
+        " 100.00%,100,1,1.0000,0,cmd,[.] do_work",
+    ]
+
+    samples = MODULE._parse_perf_report(lines, 0, CPU_TOPOLOGY, skipped_events)
+
+    assert samples == []
+    assert skipped_events == {"task-clock"}
+
+
 def test_parse_perf_report_uses_raw_period_for_precision():
     lines = [
+        *CYCLES_EVENT_HEADER,
         "# Overhead,Period,Samples,Time,CPU,Command,Symbol",
         " 0.00%,1,1,1.0000,0,cmd,[.] rare_function",
         " 0.00%,999999,1,1.0000,0,cmd,[.] common_function",
@@ -156,6 +207,7 @@ def test_parse_perf_report_uses_raw_period_for_precision():
 
     assert samples == [
         {
+            "metric_type": "cpu-cycles-spent",
             "function": "common_function",
             "cpu": "0",
             "cmd": "cmd",
@@ -168,6 +220,7 @@ def test_parse_perf_report_uses_raw_period_for_precision():
             "value": 999999,
         },
         {
+            "metric_type": "cpu-cycles-spent",
             "function": "rare_function",
             "cpu": "0",
             "cmd": "cmd",
@@ -218,6 +271,7 @@ def test_parse_cpu_topology_includes_cache_domains():
 
 def test_parse_perf_report_includes_cache_domain_breakouts():
     lines = [
+        *CYCLES_EVENT_HEADER,
         "# Overhead,Period,Samples,Time,CPU,Command,Symbol",
         " 10.00%,100,1,1.0000,0,cmd,[.] do_work",
     ]
@@ -238,6 +292,7 @@ def test_parse_perf_report_includes_cache_domain_breakouts():
 
     assert samples == [
         {
+            "metric_type": "cpu-cycles-spent",
             "function": "do_work",
             "cpu": "0",
             "cmd": "cmd",
@@ -271,6 +326,7 @@ def test_emit_perf_samples_includes_cache_domain_breakouts():
     metrics = FakeMetrics()
     samples = [
         {
+            "metric_type": "cpu-cycles-spent",
             "function": "do_work",
             "cpu": "0",
             "cmd": "cmd",
@@ -323,6 +379,7 @@ def test_emit_perf_samples_uses_expected_metric_descriptor_and_breakout():
 
     samples = [
         {
+            "metric_type": "cpu-cycles-spent",
             "function": "do_work",
             "cpu": "0",
             "cmd": "cmd",
@@ -335,6 +392,7 @@ def test_emit_perf_samples_uses_expected_metric_descriptor_and_breakout():
             "value": 250,
         },
         {
+            "metric_type": "cpu-cycles-spent",
             "function": "do_work",
             "cpu": "0",
             "cmd": "cmd",
@@ -373,3 +431,41 @@ def test_emit_perf_samples_uses_expected_metric_descriptor_and_breakout():
         )
     ]
     assert metrics.logged_by_idx == [(10, 500, 3999, 3000)]
+
+
+def test_emit_perf_samples_uses_event_specific_metric_types():
+    class FakeMetrics:
+        def __init__(self):
+            self.logged = []
+
+        def log_sample(self, file_id, desc, names, sample):
+            self.logged.append((file_id, desc, names, sample))
+            return len(self.logged)
+
+        def log_sample_by_idx(self, idx, value, end, begin=None):
+            raise AssertionError("unexpected sample aggregation")
+
+    def sample(metric_type, value):
+        return {
+            "metric_type": metric_type,
+            "function": "do_work",
+            "cpu": "0",
+            "cmd": "cmd",
+            "begin": 1000,
+            "end": 1999,
+            "value": value,
+        }
+
+    metrics = FakeMetrics()
+    MODULE._emit_perf_samples(
+        [
+            sample("cpu-cycles-spent", 100),
+            sample("cpu-instructions-spent", 200),
+        ],
+        metrics,
+    )
+
+    assert [(entry[1]["type"], entry[3]["value"]) for entry in metrics.logged] == [
+        ("cpu-cycles-spent", 100),
+        ("cpu-instructions-spent", 200),
+    ]

@@ -38,7 +38,8 @@
         {
           "source": "perf-record",
           "types": [
-            "cpu-cycles-spent"
+            "cpu-cycles-spent",
+            "cpu-instructions-spent"
           ]
         }
       ],

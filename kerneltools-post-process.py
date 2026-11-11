@@ -16,7 +16,12 @@ if TOOLBOX_HOME:
 
 TURBOSTAT_SOURCE = "turbostat"
 PERF_SOURCE = "perf-record"
-PERF_METRIC_TYPE = "cpu-cycles-spent"
+PERF_EVENT_METRIC_TYPES = {
+    "cycles": "cpu-cycles-spent",
+    "cpu-cycles": "cpu-cycles-spent",
+    "instructions": "cpu-instructions-spent",
+}
+PERF_EVENT_SECTION_RE = re.compile(r"\bof event '([^']+)'")
 PERF_REPORT_BASENAME = "perf-report.csv"
 PERF_BOOT_TIME_FILE = "kerneltools-boot-time.txt"
 PERF_CPU_TOPOLOGY_FILE = "kerneltools-cpu-topology.txt"
@@ -65,6 +70,17 @@ def _perf_bucket_begin_ms(boot_time_s: int, perf_time_s: float) -> int:
     return boot_time_s * 1000 + bucket_offset_ms
 
 
+def _perf_event_base_name(event_name: str) -> str:
+    base = event_name.strip().lower().split(":", 1)[0]
+    if base.startswith("cpu/"):
+        base = base[4:]
+    return base.rstrip("/")
+
+
+def _perf_event_metric_type(event_name: str) -> str | None:
+    return PERF_EVENT_METRIC_TYPES.get(_perf_event_base_name(event_name))
+
+
 CACHE_DOMAIN_BREAKOUTS = (
     "shared-l1-domain",
     "shared-l2-domain",
@@ -99,10 +115,14 @@ def _parse_cpu_topology(lines: Iterable[str]) -> dict[int, dict[str, object]]:
 
 
 def _parse_perf_report(
-    lines: Iterable[str], boot_time_s: int, cpu_topology: dict[int, dict[str, object]] | None = None
+    lines: Iterable[str],
+    boot_time_s: int,
+    cpu_topology: dict[int, dict[str, object]] | None = None,
+    skipped_events: set[str] | None = None,
 ) -> list[dict[str, object]]:
     col_idx: dict[str, int] = {}
-    periods: dict[tuple[int, str, str, str], int] = {}
+    periods: dict[tuple[str, int, str, str, str], int] = {}
+    current_metric_type: str | None = None
 
     for raw_line in lines:
         line = raw_line.rstrip("\n")
@@ -112,12 +132,18 @@ def _parse_perf_report(
             continue
 
         if stripped.startswith("#"):
+            event_match = PERF_EVENT_SECTION_RE.search(stripped)
+            if event_match:
+                event_name = event_match.group(1)
+                current_metric_type = _perf_event_metric_type(event_name)
+                if current_metric_type is None and skipped_events is not None:
+                    skipped_events.add(event_name)
             if stripped.startswith("# Overhead"):
                 cols = stripped.lstrip("#").split(",")
                 col_idx = {col.strip(): i for i, col in enumerate(cols)}
             continue
 
-        if not col_idx:
+        if not col_idx or current_metric_type is None:
             continue
 
         fields = [field.strip() for field in line.split(",")]
@@ -152,14 +178,15 @@ def _parse_perf_report(
             continue
 
         begin_ms = _perf_bucket_begin_ms(boot_time_s, perf_time)
-        bucket_key = (begin_ms, function, cpu, command)
+        bucket_key = (current_metric_type, begin_ms, function, cpu, command)
         periods[bucket_key] = periods.get(bucket_key, 0) + period
 
     samples: list[dict[str, object]] = []
-    for (begin_ms, function, cpu, command), value in sorted(periods.items()):
+    for (metric_type, begin_ms, function, cpu, command), value in sorted(periods.items()):
         topology = (cpu_topology or {}).get(int(cpu), {})
         samples.append(
             {
+                "metric_type": metric_type,
                 "function": function,
                 "cpu": cpu,
                 "cmd": command,
@@ -181,19 +208,14 @@ def _parse_perf_report(
 
 
 def _emit_perf_samples(samples: list[dict[str, object]], metrics) -> None:
-    desc = {
-        "source": PERF_SOURCE,
-        "class": "count",
-        "type": PERF_METRIC_TYPE,
-        "default-aggregation": "sum",
-    }
-    metric_idx_cache: dict[tuple[str, str, str], int] = {}
+    metric_idx_cache: dict[tuple[str, str, str, str], int] = {}
 
     for sample in samples:
+        metric_type = str(sample["metric_type"])
         function = str(sample["function"])
         cpu = str(sample["cpu"])
         command = str(sample["cmd"])
-        cache_key = (function, cpu, command)
+        cache_key = (metric_type, function, cpu, command)
         names = {"function": function, "cpu": cpu, "cmd": command}
         for breakout in ("package", "die", "core", "thread", *CACHE_DOMAIN_BREAKOUTS):
             if sample.get(breakout) is not None:
@@ -212,6 +234,12 @@ def _emit_perf_samples(samples: list[dict[str, object]], metrics) -> None:
                 metric_sample["begin"],
             )
         else:
+            desc = {
+                "source": PERF_SOURCE,
+                "class": "count",
+                "type": metric_type,
+                "default-aggregation": "sum",
+            }
             metric_idx_cache[cache_key] = metrics.log_sample(
                 PERF_SOURCE, desc, names, metric_sample
             )
@@ -336,9 +364,13 @@ def process_perf_report(report_file: str, boot_time_file: str) -> None:
         except FileNotFoundError:
             print("WARNING: could not find CPU topology file; omitting topology breakouts")
             cpu_topology = {}
-        samples = _parse_perf_report(fh, boot_time_s, cpu_topology)
+        skipped_events: set[str] = set()
+        samples = _parse_perf_report(fh, boot_time_s, cpu_topology, skipped_events)
     finally:
         fh.close()
+
+    for event_name in sorted(skipped_events):
+        print(f"WARNING: ignoring unsupported perf event '{event_name}'")
 
     if not samples:
         print("WARNING: no perf-report samples found")

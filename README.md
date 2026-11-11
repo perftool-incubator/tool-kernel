@@ -41,24 +41,32 @@ and before compressing `perf.data`, `kerneltools-stop` generates
 `perf-report.csv.xz` with one-second time buckets.
 
 The controller post-processor converts each symbol's sampled event period in
-each bucket into a CDM sample:
+each bucket into a CDM sample. The event section in the perf report controls the
+metric type:
 
-- source: `perf-record`
-- type: `cpu-cycles-spent`
-- class: `count`
-- default aggregation: `sum`
-- breakouts: `function`, `cpu`, `cmd`, `package`, `die`, `core`, `thread`,
-  `shared-l1-domain`, `shared-l2-domain`, `shared-l3-domain`, `shared-l4-domain`
-- value: the sum of the raw event `Period` values for that function and CPU,
-  avoiding the two-decimal precision loss in perf's displayed `Overhead` column
+- `cycles` or `cpu-cycles` (including modifiers such as `cycles:u`) produces
+  type `cpu-cycles-spent`.
+- `instructions` (including modifiers such as `instructions:k`) produces type
+  `cpu-instructions-spent`.
+- Unsupported events are skipped with a warning so their values cannot be mixed
+  into a metric with different units.
 
-For the default cycles event, this represents sampled CPU cycles spent in the
-function on that CPU; it is not wall-clock or CPU time unless event frequency
-is known. Rows for the same function, CPU, cmd, and time bucket are summed.
-The package, die, core, thread, and shared-cache-domain labels come from the topology
-captured on the collection host. If a function, CPU, and cmd combination does not
-appear in a bucket, no sample is emitted for that combination in that bucket;
-gaps are not zero-filled.
+All perf samples use source `perf-record`, class `count`, and default
+aggregation `sum`. Breakouts are `function`, `cpu`, `cmd`, `package`, `die`,
+`core`, `thread`, `shared-l1-domain`, `shared-l2-domain`,
+`shared-l3-domain`, and `shared-l4-domain`. The value is the sum of the raw
+event `Period` values for that function, CPU, cmd, event, and time bucket,
+avoiding the two-decimal precision loss in perf's displayed `Overhead` column.
+
+For the default cycles event, `cpu-cycles-spent` represents sampled CPU cycles
+spent in the function on that CPU; it is not wall-clock or CPU time unless event
+frequency is known. `cpu-instructions-spent` similarly represents sampled
+retired instructions. Multiple events, such as
+`--record-opts "-e cycles,instructions"`, produce separate metrics and are never
+summed together. The package, die, core, thread, and shared-cache-domain labels
+come from the topology captured on the collection host. If a function, CPU, and
+cmd combination does not appear in a bucket, no sample is emitted for that
+combination in that bucket; gaps are not zero-filled.
 
 ## Integration
 
