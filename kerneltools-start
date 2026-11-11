@@ -98,6 +98,22 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
                 die=$(cat "$cpu_path/topology/die_id" 2>/dev/null)
                 core=$(cat "$cpu_path/topology/core_id" 2>/dev/null)
                 siblings=$(cat "$cpu_path/topology/thread_siblings_list" 2>/dev/null)
+                shared_l1_domain=""
+                shared_l2_domain=""
+                shared_l3_domain=""
+                shared_l4_domain=""
+                for cache_path in "$cpu_path/cache"/index*; do
+                    [ -d "$cache_path" ] || continue
+                    cache_level=$(cat "$cache_path/level" 2>/dev/null)
+                    shared_cpus=$(cat "$cache_path/shared_cpu_list" 2>/dev/null)
+                    [ -n "$shared_cpus" ] || continue
+                    case "$cache_level" in
+                        1) shared_l1_domain=$shared_cpus ;;
+                        2) shared_l2_domain=$shared_cpus ;;
+                        3) shared_l3_domain=$shared_cpus ;;
+                        4) shared_l4_domain=$shared_cpus ;;
+                    esac
+                done
                 : "${package:=0}"
                 : "${die:=0}"
                 : "${core:=$cpu}"
@@ -121,9 +137,22 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
                             ;;
                     esac
                 done
-                printf 'cpu=%s package=%s die=%s core=%s thread=%s\n' \
+                printf 'cpu=%s package=%s die=%s core=%s thread=%s' \
                     "$cpu" "$package" "$die" "$core" "$thread" \
                     >>kerneltools-cpu-topology.txt
+                if [ -n "$shared_l1_domain" ]; then
+                    printf ' shared-l1-domain=%s' "$shared_l1_domain" >>kerneltools-cpu-topology.txt
+                fi
+                if [ -n "$shared_l2_domain" ]; then
+                    printf ' shared-l2-domain=%s' "$shared_l2_domain" >>kerneltools-cpu-topology.txt
+                fi
+                if [ -n "$shared_l3_domain" ]; then
+                    printf ' shared-l3-domain=%s' "$shared_l3_domain" >>kerneltools-cpu-topology.txt
+                fi
+                if [ -n "$shared_l4_domain" ]; then
+                    printf ' shared-l4-domain=%s' "$shared_l4_domain" >>kerneltools-cpu-topology.txt
+                fi
+                printf '\n' >>kerneltools-cpu-topology.txt
             done
             cmd="/usr/bin/perf record -a $record_opts"
             boot_time=$(date -u --date="$(TZ=UTC uptime -s)" +%s)

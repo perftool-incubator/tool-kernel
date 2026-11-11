@@ -47,15 +47,16 @@ each bucket into a CDM sample:
 - type: `cpu-cycles-spent`
 - class: `count`
 - default aggregation: `sum`
-- breakouts: `function`, `cpu`, `cmd`, `package`, `die`, `core`, `thread`
+- breakouts: `function`, `cpu`, `cmd`, `package`, `die`, `core`, `thread`,
+  `shared-l1-domain`, `shared-l2-domain`, `shared-l3-domain`, `shared-l4-domain`
 - value: the sum of the raw event `Period` values for that function and CPU,
   avoiding the two-decimal precision loss in perf's displayed `Overhead` column
 
 For the default cycles event, this represents sampled CPU cycles spent in the
 function on that CPU; it is not wall-clock or CPU time unless event frequency
 is known. Rows for the same function, CPU, cmd, and time bucket are summed.
-The package, die, core, and thread labels come from the topology captured on
-the collection host. If a function, CPU, and cmd combination does not
+The package, die, core, thread, and shared-cache-domain labels come from the topology
+captured on the collection host. If a function, CPU, and cmd combination does not
 appear in a bucket, no sample is emitted for that combination in that bucket;
 gaps are not zero-filled.
 

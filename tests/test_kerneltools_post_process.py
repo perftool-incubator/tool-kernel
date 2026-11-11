@@ -190,6 +190,106 @@ def test_clean_perf_symbol_strips_execution_domain_markers():
     assert MODULE._clean_perf_symbol("-") is None
 
 
+def test_parse_cpu_topology_includes_cache_domains():
+    lines = [
+        "cpu=0 package=1 die=2 core=3 thread=0 shared-l1-domain=0 shared-l3-domain=0-3",
+        "cpu=1 package=1 die=2 core=3 thread=1 shared-l1-domain=0 shared-l3-domain=0-3",
+    ]
+
+    assert MODULE._parse_cpu_topology(lines) == {
+        0: {
+            "package_id": 1,
+            "die_id": 2,
+            "core_id": 3,
+            "thread_id": 0,
+            "shared-l1-domain": "0",
+            "shared-l3-domain": "0-3",
+        },
+        1: {
+            "package_id": 1,
+            "die_id": 2,
+            "core_id": 3,
+            "thread_id": 1,
+            "shared-l1-domain": "0",
+            "shared-l3-domain": "0-3",
+        },
+    }
+
+
+def test_parse_perf_report_includes_cache_domain_breakouts():
+    lines = [
+        "# Overhead,Period,Samples,Time,CPU,Command,Symbol",
+        " 10.00%,100,1,1.0000,0,cmd,[.] do_work",
+    ]
+    topology = {
+        0: {
+            "package_id": 1,
+            "die_id": 2,
+            "core_id": 3,
+            "thread_id": 0,
+            "shared-l1-domain": "0",
+            "shared-l2-domain": "0-1",
+            "shared-l3-domain": "0-3",
+            "shared-l4-domain": "0-7",
+        }
+    }
+
+    samples = MODULE._parse_perf_report(lines, 0, topology)
+
+    assert samples == [
+        {
+            "function": "do_work",
+            "cpu": "0",
+            "cmd": "cmd",
+            "package": "1",
+            "die": "2",
+            "core": "3",
+            "thread": "0",
+            "shared-l1-domain": "0",
+            "shared-l2-domain": "0-1",
+            "shared-l3-domain": "0-3",
+            "shared-l4-domain": "0-7",
+            "begin": 1000,
+            "end": 1999,
+            "value": 100,
+        }
+    ]
+
+
+def test_emit_perf_samples_includes_cache_domain_breakouts():
+    class FakeMetrics:
+        def __init__(self):
+            self.names = None
+
+        def log_sample(self, file_id, desc, names, sample):
+            self.names = names
+            return 1
+
+        def log_sample_by_idx(self, idx, value, end, begin=None):
+            pass
+
+    metrics = FakeMetrics()
+    samples = [
+        {
+            "function": "do_work",
+            "cpu": "0",
+            "cmd": "cmd",
+            "package": "1",
+            "die": "2",
+            "core": "3",
+            "thread": "0",
+            "shared-l3-domain": "0-3",
+            "begin": 1000,
+            "end": 1999,
+            "value": 100,
+        }
+    ]
+
+    MODULE._emit_perf_samples(samples, metrics)
+
+    assert metrics.names["shared-l3-domain"] == "0-3"
+
+
 def test_parse_cpu_topology_ignores_malformed_lines():
     lines = [
         "cpu=0 package=1 die=2 core=3 thread=0",

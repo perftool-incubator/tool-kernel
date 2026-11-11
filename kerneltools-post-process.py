@@ -65,27 +65,41 @@ def _perf_bucket_begin_ms(boot_time_s: int, perf_time_s: float) -> int:
     return boot_time_s * 1000 + bucket_offset_ms
 
 
-def _parse_cpu_topology(lines: Iterable[str]) -> dict[int, dict[str, int]]:
-    topology: dict[int, dict[str, int]] = {}
-    pattern = re.compile(
-        r"^cpu=(\d+) package=(\d+) die=(\d+) core=(\d+) thread=(\d+)$"
-    )
+CACHE_DOMAIN_BREAKOUTS = (
+    "shared-l1-domain",
+    "shared-l2-domain",
+    "shared-l3-domain",
+    "shared-l4-domain",
+)
+
+
+def _parse_cpu_topology(lines: Iterable[str]) -> dict[int, dict[str, object]]:
+    topology: dict[int, dict[str, object]] = {}
     for raw_line in lines:
-        match = pattern.match(raw_line.strip())
-        if not match:
+        fields = {}
+        for field in raw_line.strip().split():
+            key, separator, value = field.partition("=")
+            if separator:
+                fields[key] = value
+
+        try:
+            cpu = int(fields["cpu"])
+            topology[cpu] = {
+                "package_id": int(fields["package"]),
+                "die_id": int(fields["die"]),
+                "core_id": int(fields["core"]),
+                "thread_id": int(fields["thread"]),
+            }
+            for breakout in CACHE_DOMAIN_BREAKOUTS:
+                if fields.get(breakout):
+                    topology[cpu][breakout] = fields[breakout]
+        except (KeyError, ValueError):
             continue
-        cpu, package, die, core, thread = map(int, match.groups())
-        topology[cpu] = {
-            "package_id": package,
-            "die_id": die,
-            "core_id": core,
-            "thread_id": thread,
-        }
     return topology
 
 
 def _parse_perf_report(
-    lines: Iterable[str], boot_time_s: int, cpu_topology: dict[int, dict[str, int]] | None = None
+    lines: Iterable[str], boot_time_s: int, cpu_topology: dict[int, dict[str, object]] | None = None
 ) -> list[dict[str, object]]:
     col_idx: dict[str, int] = {}
     periods: dict[tuple[int, str, str, str], int] = {}
@@ -153,6 +167,11 @@ def _parse_perf_report(
                 "die": str(topology["die_id"]) if "die_id" in topology else None,
                 "core": str(topology["core_id"]) if "core_id" in topology else None,
                 "thread": str(topology["thread_id"]) if "thread_id" in topology else None,
+                **{
+                    breakout: topology.get(breakout)
+                    for breakout in CACHE_DOMAIN_BREAKOUTS
+                    if breakout in topology
+                },
                 "begin": begin_ms,
                 "end": begin_ms + PERF_TIME_QUANTUM_MS - 1,
                 "value": value,
@@ -176,7 +195,7 @@ def _emit_perf_samples(samples: list[dict[str, object]], metrics) -> None:
         command = str(sample["cmd"])
         cache_key = (function, cpu, command)
         names = {"function": function, "cpu": cpu, "cmd": command}
-        for breakout in ("package", "die", "core", "thread"):
+        for breakout in ("package", "die", "core", "thread", *CACHE_DOMAIN_BREAKOUTS):
             if sample.get(breakout) is not None:
                 names[breakout] = str(sample[breakout])
         metric_sample = {
