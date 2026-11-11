@@ -45,11 +45,16 @@ each bucket into a CDM sample. The event section in the perf report controls the
 metric type:
 
 - `cycles` or `cpu-cycles` (including modifiers such as `cycles:u`) produces
-  type `cpu-cycles-spent`.
+  type `cpu-cycles`.
 - `instructions` (including modifiers such as `instructions:k`) produces type
-  `cpu-instructions-spent`.
+  `cpu-instructions`.
 - Unsupported events are skipped with a warning so their values cannot be mixed
   into a metric with different units.
+
+Metric types use the perf event name as the noun and do not append an
+aggregation suffix. The `count` class and `sum` default aggregation already
+describe additive semantics; a future `branch-misses` mapping would be
+`cpu-branch-misses`.
 
 All perf samples use source `perf-record`, class `count`, and default
 aggregation `sum`. Breakouts are `function`, `cpu`, `cmd`, `package`, `die`,
@@ -58,9 +63,9 @@ aggregation `sum`. Breakouts are `function`, `cpu`, `cmd`, `package`, `die`,
 event `Period` values for that function, CPU, cmd, event, and time bucket,
 avoiding the two-decimal precision loss in perf's displayed `Overhead` column.
 
-For the default cycles event, `cpu-cycles-spent` represents sampled CPU cycles
+For the default cycles event, `cpu-cycles` represents sampled CPU cycles
 spent in the function on that CPU; it is not wall-clock or CPU time unless event
-frequency is known. `cpu-instructions-spent` similarly represents sampled
+frequency is known. `cpu-instructions` similarly represents sampled
 retired instructions. Multiple events, such as
 `--record-opts "-e cycles,instructions"`, produce separate metrics and are never
 summed together. The package, die, core, thread, and shared-cache-domain labels

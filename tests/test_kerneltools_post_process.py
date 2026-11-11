@@ -37,7 +37,7 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
 
     assert samples == [
         {
-            "metric_type": "cpu-cycles-spent",
+            "metric_type": "cpu-cycles",
             "function": "do_work",
             "cpu": "0",
             "cmd": "cmd",
@@ -50,7 +50,7 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
             "value": 100,
         },
         {
-            "metric_type": "cpu-cycles-spent",
+            "metric_type": "cpu-cycles",
             "function": "do_work",
             "cpu": "1",
             "cmd": "cmd",
@@ -63,7 +63,7 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
             "value": 150,
         },
         {
-            "metric_type": "cpu-cycles-spent",
+            "metric_type": "cpu-cycles",
             "function": "do_work",
             "cpu": "1",
             "cmd": "other-cmd",
@@ -76,7 +76,7 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
             "value": 75,
         },
         {
-            "metric_type": "cpu-cycles-spent",
+            "metric_type": "cpu-cycles",
             "function": "other_work",
             "cpu": "0",
             "cmd": "cmd",
@@ -89,7 +89,7 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
             "value": 250,
         },
         {
-            "metric_type": "cpu-cycles-spent",
+            "metric_type": "cpu-cycles",
             "function": "other_work",
             "cpu": "0",
             "cmd": "cmd",
@@ -102,7 +102,7 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
             "value": 450,
         },
         {
-            "metric_type": "cpu-cycles-spent",
+            "metric_type": "cpu-cycles",
             "function": "schedule",
             "cpu": "0",
             "cmd": "cmd",
@@ -115,7 +115,7 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
             "value": 50,
         },
         {
-            "metric_type": "cpu-cycles-spent",
+            "metric_type": "cpu-cycles",
             "function": "do_work",
             "cpu": "0",
             "cmd": "cmd",
@@ -128,7 +128,7 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
             "value": 25,
         },
         {
-            "metric_type": "cpu-cycles-spent",
+            "metric_type": "cpu-cycles",
             "function": "other_work",
             "cpu": "0",
             "cmd": "cmd",
@@ -175,8 +175,8 @@ def test_parse_perf_report_keeps_supported_event_types_separate():
     samples = MODULE._parse_perf_report(lines, 0, CPU_TOPOLOGY)
 
     assert [(sample["metric_type"], sample["value"]) for sample in samples] == [
-        ("cpu-cycles-spent", 100),
-        ("cpu-instructions-spent", 200),
+        ("cpu-cycles", 100),
+        ("cpu-instructions", 200),
     ]
 
 
@@ -207,7 +207,7 @@ def test_parse_perf_report_uses_raw_period_for_precision():
 
     assert samples == [
         {
-            "metric_type": "cpu-cycles-spent",
+            "metric_type": "cpu-cycles",
             "function": "common_function",
             "cpu": "0",
             "cmd": "cmd",
@@ -220,7 +220,7 @@ def test_parse_perf_report_uses_raw_period_for_precision():
             "value": 999999,
         },
         {
-            "metric_type": "cpu-cycles-spent",
+            "metric_type": "cpu-cycles",
             "function": "rare_function",
             "cpu": "0",
             "cmd": "cmd",
@@ -292,7 +292,7 @@ def test_parse_perf_report_includes_cache_domain_breakouts():
 
     assert samples == [
         {
-            "metric_type": "cpu-cycles-spent",
+            "metric_type": "cpu-cycles",
             "function": "do_work",
             "cpu": "0",
             "cmd": "cmd",
@@ -326,7 +326,7 @@ def test_emit_perf_samples_includes_cache_domain_breakouts():
     metrics = FakeMetrics()
     samples = [
         {
-            "metric_type": "cpu-cycles-spent",
+            "metric_type": "cpu-cycles",
             "function": "do_work",
             "cpu": "0",
             "cmd": "cmd",
@@ -379,7 +379,7 @@ def test_emit_perf_samples_uses_expected_metric_descriptor_and_breakout():
 
     samples = [
         {
-            "metric_type": "cpu-cycles-spent",
+            "metric_type": "cpu-cycles",
             "function": "do_work",
             "cpu": "0",
             "cmd": "cmd",
@@ -392,7 +392,7 @@ def test_emit_perf_samples_uses_expected_metric_descriptor_and_breakout():
             "value": 250,
         },
         {
-            "metric_type": "cpu-cycles-spent",
+            "metric_type": "cpu-cycles",
             "function": "do_work",
             "cpu": "0",
             "cmd": "cmd",
@@ -415,7 +415,7 @@ def test_emit_perf_samples_uses_expected_metric_descriptor_and_breakout():
             {
                 "source": "perf-record",
                 "class": "count",
-                "type": "cpu-cycles-spent",
+                "type": "cpu-cycles",
                 "default-aggregation": "sum",
             },
             {
@@ -459,13 +459,13 @@ def test_emit_perf_samples_uses_event_specific_metric_types():
     metrics = FakeMetrics()
     MODULE._emit_perf_samples(
         [
-            sample("cpu-cycles-spent", 100),
-            sample("cpu-instructions-spent", 200),
+            sample("cpu-cycles", 100),
+            sample("cpu-instructions", 200),
         ],
         metrics,
     )
 
     assert [(entry[1]["type"], entry[3]["value"]) for entry in metrics.logged] == [
-        ("cpu-cycles-spent", 100),
-        ("cpu-instructions-spent", 200),
+        ("cpu-cycles", 100),
+        ("cpu-instructions", 200),
     ]

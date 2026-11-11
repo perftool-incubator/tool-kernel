@@ -17,9 +17,9 @@ if TOOLBOX_HOME:
 TURBOSTAT_SOURCE = "turbostat"
 PERF_SOURCE = "perf-record"
 PERF_EVENT_METRIC_TYPES = {
-    "cycles": "cpu-cycles-spent",
-    "cpu-cycles": "cpu-cycles-spent",
-    "instructions": "cpu-instructions-spent",
+    "cycles": "cpu-cycles",
+    "cpu-cycles": "cpu-cycles",
+    "instructions": "cpu-instructions",
 }
 PERF_EVENT_SECTION_RE = re.compile(r"\bof event '([^']+)'")
 PERF_REPORT_BASENAME = "perf-report.csv"
