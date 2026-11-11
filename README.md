@@ -40,6 +40,19 @@ topology in `kerneltools-cpu-topology.txt`. At stop time, after `perf archive`
 and before compressing `perf.data`, `kerneltools-stop` generates
 `perf-report.csv.xz` with one-second time buckets.
 
+Unless `--record-opts` already contains `-e` or `--event`, `perf record`
+collects this default event set:
+
+```text
+cycles,instructions,branch-instructions,branch-misses,cache-misses
+```
+
+These five hardware events provide cycle, instruction, branch, and cache-miss
+counts while fitting within the non-multiplexed counter budget of the target
+hosts. An explicit `--record-opts "-e ..."` selection replaces the default.
+If that set exceeds the available hardware counters, perf multiplexes the
+events and reduces their effective sampling rates.
+
 The controller post-processor converts each symbol's sampled event period in
 each bucket into a CDM sample. The event section in the perf report controls the
 metric type:
@@ -48,12 +61,17 @@ metric type:
   type `cpu-cycles`.
 - `instructions` (including modifiers such as `instructions:k`) produces type
   `cpu-instructions`.
+- `branch-instructions` or `branches` produces type
+  `cpu-branch-instructions`.
+- `branch-misses` produces type `cpu-branch-misses`.
+- `cache-references` produces type `cpu-cache-references`.
+- `cache-misses` produces type `cpu-cache-misses`.
 - Unsupported events are skipped with a warning so their values cannot be mixed
   into a metric with different units.
 
 Metric types use the perf event name as the noun and do not append an
 aggregation suffix. The `count` class and `sum` default aggregation already
-describe additive semantics; a future `branch-misses` mapping would be
+describe additive semantics; for example, `branch-misses` maps to
 `cpu-branch-misses`.
 
 All perf samples use source `perf-record`, class `count`, and default
@@ -63,12 +81,11 @@ aggregation `sum`. Breakouts are `function`, `cpu`, `cmd`, `package`, `die`,
 event `Period` values for that function, CPU, cmd, event, and time bucket,
 avoiding the two-decimal precision loss in perf's displayed `Overhead` column.
 
-For the default cycles event, `cpu-cycles` represents sampled CPU cycles
-spent in the function on that CPU; it is not wall-clock or CPU time unless event
-frequency is known. `cpu-instructions` similarly represents sampled
-retired instructions. Multiple events, such as
-`--record-opts "-e cycles,instructions"`, produce separate metrics and are never
-summed together. The package, die, core, thread, and shared-cache-domain labels
+`cpu-cycles` represents sampled CPU cycles spent in the function on that CPU;
+it is not wall-clock or CPU time unless event frequency is known.
+`cpu-instructions` similarly represents sampled retired instructions. Multiple
+events, including the default set, produce separate metrics and are never summed
+together. The package, die, core, thread, and shared-cache-domain labels
 come from the topology captured on the collection host. If a function, CPU, and
 cmd combination does not appear in a bucket, no sample is emitted for that
 combination in that bucket; gaps are not zero-filled.

@@ -20,6 +20,11 @@ PERF_EVENT_METRIC_TYPES = {
     "cycles": "cpu-cycles",
     "cpu-cycles": "cpu-cycles",
     "instructions": "cpu-instructions",
+    "branch-instructions": "cpu-branch-instructions",
+    "branches": "cpu-branch-instructions",
+    "branch-misses": "cpu-branch-misses",
+    "cache-references": "cpu-cache-references",
+    "cache-misses": "cpu-cache-misses",
 }
 PERF_EVENT_SECTION_RE = re.compile(r"\bof event '([^']+)'")
 PERF_REPORT_BASENAME = "perf-report.csv"

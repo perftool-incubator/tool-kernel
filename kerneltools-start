@@ -21,6 +21,7 @@ echo
 subtools="turbostat" # subtools that will be used, any combination of: turbostat,perf,speed-select-util,trace-cmd,sysfs-trace <no-spaces>
 interval=10
 record_opts=""
+default_perf_events="cycles,instructions,branch-instructions,branch-misses,cache-misses"
 base_freq=""
 core_power=""
 turbo_freq=""
@@ -154,7 +155,20 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
                 fi
                 printf '\n' >>kerneltools-cpu-topology.txt
             done
-            cmd="/usr/bin/perf record -a $record_opts"
+            perf_events_requested=0
+            for record_opt in $record_opts; do
+                case "$record_opt" in
+                    -e|--event|--event=*|-e?*)
+                        perf_events_requested=1
+                        break
+                        ;;
+                esac
+            done
+            perf_record_opts=$record_opts
+            if [ "$perf_events_requested" -eq 0 ]; then
+                perf_record_opts="-e $default_perf_events $record_opts"
+            fi
+            cmd="/usr/bin/perf record -a $perf_record_opts"
             boot_time=$(date -u --date="$(TZ=UTC uptime -s)" +%s)
             printf '%s\n' "$boot_time" >kerneltools-boot-time.txt
             echo "uptime as seconds since epoch: $boot_time"

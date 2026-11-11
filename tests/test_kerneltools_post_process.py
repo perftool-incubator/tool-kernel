@@ -180,6 +180,33 @@ def test_parse_perf_report_keeps_supported_event_types_separate():
     ]
 
 
+def test_parse_perf_report_maps_default_event_set():
+    events = (
+        ("cycles", 100, "cpu-cycles"),
+        ("instructions", 200, "cpu-instructions"),
+        ("branch-instructions", 300, "cpu-branch-instructions"),
+        ("branch-misses", 400, "cpu-branch-misses"),
+        ("cache-misses", 500, "cpu-cache-misses"),
+    )
+    lines = []
+    for event, value, _ in events:
+        lines.extend(
+            [
+                f"# Samples: 1  of event '{event}'",
+                "# Event count (approx.): 1",
+                "# Overhead,Period,Samples,Time,CPU,Command,Symbol",
+                f" 20.00%,{value},1,1.0000,0,cmd,[.] do_work",
+                "",
+            ]
+        )
+
+    samples = MODULE._parse_perf_report(lines, 0, CPU_TOPOLOGY)
+
+    assert {(sample["metric_type"], sample["value"]) for sample in samples} == {
+        (metric_type, value) for _, value, metric_type in events
+    }
+
+
 def test_parse_perf_report_skips_unsupported_event_types():
     skipped_events = set()
     lines = [

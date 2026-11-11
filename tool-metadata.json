@@ -39,7 +39,11 @@
           "source": "perf-record",
           "types": [
             "cpu-cycles",
-            "cpu-instructions"
+            "cpu-instructions",
+            "cpu-branch-instructions",
+            "cpu-branch-misses",
+            "cpu-cache-references",
+            "cpu-cache-misses"
           ]
         }
       ],
