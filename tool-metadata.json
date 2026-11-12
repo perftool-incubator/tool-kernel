@@ -32,11 +32,27 @@
     },
     {
       "name": "perf",
-      "description": "Hardware performance counter sampling (IPC, cache misses, branch stats) via 'perf record'. '--perf-gen-local-report ON' additionally generates 'perf-report.txt'.",
-      "cdm_indexed": false,
+      "description": "Hardware performance counter sampling (IPC, cache misses, branch stats) via 'perf record'. A structured symbol report is generated at stop time for CDM indexing; '--perf-gen-local-report ON' additionally generates 'perf-report.txt'.",
+      "cdm_indexed": true,
+      "cdm_sources": [
+        {
+          "source": "perf-record",
+          "types": [
+            "cpu-cycles",
+            "cpu-instructions",
+            "cpu-branch-instructions",
+            "cpu-branch-misses",
+            "cpu-cache-references",
+            "cpu-cache-misses"
+          ]
+        }
+      ],
       "output_files": [
         "perf.data.xz",
-        "perf.data.tar.bz2"
+        "perf.data.tar.bz2",
+        "kerneltools-boot-time.txt",
+        "kerneltools-cpu-topology.txt",
+        "perf-report.csv.xz"
       ]
     },
     {

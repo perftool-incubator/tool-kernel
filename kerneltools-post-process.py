@@ -7,16 +7,30 @@ from __future__ import annotations
 import os
 import re
 import sys
+from collections.abc import Iterable
 from pathlib import Path
 
 TOOLBOX_HOME = os.environ.get("TOOLBOX_HOME")
 if TOOLBOX_HOME:
     sys.path.append(str(Path(TOOLBOX_HOME) / "python"))
 
-from toolbox.cdm_metrics import CDMMetrics
-from toolbox.fileio import open_read_text_file
-
-SOURCE = "turbostat"
+TURBOSTAT_SOURCE = "turbostat"
+PERF_SOURCE = "perf-record"
+PERF_EVENT_METRIC_TYPES = {
+    "cycles": "cpu-cycles",
+    "cpu-cycles": "cpu-cycles",
+    "instructions": "cpu-instructions",
+    "branch-instructions": "cpu-branch-instructions",
+    "branches": "cpu-branch-instructions",
+    "branch-misses": "cpu-branch-misses",
+    "cache-references": "cpu-cache-references",
+    "cache-misses": "cpu-cache-misses",
+}
+PERF_EVENT_SECTION_RE = re.compile(r"\bof event '([^']+)'")
+PERF_REPORT_BASENAME = "perf-report.csv"
+PERF_BOOT_TIME_FILE = "kerneltools-boot-time.txt"
+PERF_CPU_TOPOLOGY_FILE = "kerneltools-cpu-topology.txt"
+PERF_TIME_QUANTUM_MS = 1000
 
 
 def _safe_float(fields: list[str], col_idx: dict[str, int], name: str) -> float | None:
@@ -29,8 +43,218 @@ def _safe_float(fields: list[str], col_idx: dict[str, int], name: str) -> float 
         return None
 
 
+def _clean_perf_symbol(raw_symbol: str) -> str | None:
+    symbol = raw_symbol.strip()
+    if symbol in ("", "-"):
+        return None
+
+    # perf decorates symbols with their execution domain. The first pass keeps
+    # the symbol itself as the function breakout and leaves domain breakouts
+    # for a later change.
+    for prefix in ("[.] ", "[k] ", "[g] ", "[guest] ", "[kernel.kallsyms] "):
+        if symbol.startswith(prefix):
+            symbol = symbol[len(prefix):].strip()
+            break
+
+    return symbol or None
+
+
+def _safe_int(fields: list[str], col_idx: dict[str, int], name: str) -> int | None:
+    idx = col_idx.get(name)
+    if idx is None or idx >= len(fields):
+        return None
+    try:
+        return int(fields[idx])
+    except ValueError:
+        return None
+
+
+def _perf_bucket_begin_ms(boot_time_s: int, perf_time_s: float) -> int:
+    perf_time_ms = int(perf_time_s * 1000)
+    bucket_offset_ms = (perf_time_ms // PERF_TIME_QUANTUM_MS) * PERF_TIME_QUANTUM_MS
+    return boot_time_s * 1000 + bucket_offset_ms
+
+
+def _perf_event_base_name(event_name: str) -> str:
+    base = event_name.strip().lower().split(":", 1)[0]
+    if base.startswith("cpu/"):
+        base = base[4:]
+    return base.rstrip("/")
+
+
+def _perf_event_metric_type(event_name: str) -> str | None:
+    return PERF_EVENT_METRIC_TYPES.get(_perf_event_base_name(event_name))
+
+
+CACHE_DOMAIN_BREAKOUTS = (
+    "shared-l1-domain",
+    "shared-l2-domain",
+    "shared-l3-domain",
+    "shared-l4-domain",
+)
+
+
+def _parse_cpu_topology(lines: Iterable[str]) -> dict[int, dict[str, object]]:
+    topology: dict[int, dict[str, object]] = {}
+    for raw_line in lines:
+        fields = {}
+        for field in raw_line.strip().split():
+            key, separator, value = field.partition("=")
+            if separator:
+                fields[key] = value
+
+        try:
+            cpu = int(fields["cpu"])
+            topology[cpu] = {
+                "package_id": int(fields["package"]),
+                "die_id": int(fields["die"]),
+                "core_id": int(fields["core"]),
+                "thread_id": int(fields["thread"]),
+            }
+            for breakout in CACHE_DOMAIN_BREAKOUTS:
+                if fields.get(breakout):
+                    topology[cpu][breakout] = fields[breakout]
+        except (KeyError, ValueError):
+            continue
+    return topology
+
+
+def _parse_perf_report(
+    lines: Iterable[str],
+    boot_time_s: int,
+    cpu_topology: dict[int, dict[str, object]] | None = None,
+    skipped_events: set[str] | None = None,
+) -> list[dict[str, object]]:
+    col_idx: dict[str, int] = {}
+    periods: dict[tuple[str, int, str, str, str], int] = {}
+    current_metric_type: str | None = None
+
+    for raw_line in lines:
+        line = raw_line.rstrip("\n")
+        stripped = line.lstrip()
+
+        if not stripped:
+            continue
+
+        if stripped.startswith("#"):
+            event_match = PERF_EVENT_SECTION_RE.search(stripped)
+            if event_match:
+                event_name = event_match.group(1)
+                current_metric_type = _perf_event_metric_type(event_name)
+                if current_metric_type is None and skipped_events is not None:
+                    skipped_events.add(event_name)
+            if stripped.startswith("# Overhead"):
+                cols = stripped.lstrip("#").split(",")
+                col_idx = {col.strip(): i for i, col in enumerate(cols)}
+            continue
+
+        if not col_idx or current_metric_type is None:
+            continue
+
+        fields = [field.strip() for field in line.split(",")]
+        period = _safe_int(fields, col_idx, "Period")
+        perf_time = _safe_float(fields, col_idx, "Time")
+        cpu_idx = col_idx.get("CPU")
+        command_idx = col_idx.get("Command")
+        symbol_idx = col_idx.get("Symbol")
+        if (
+            period is None
+            or period < 0
+            or perf_time is None
+            or cpu_idx is None
+            or cpu_idx >= len(fields)
+            or command_idx is None
+            or command_idx >= len(fields)
+            or symbol_idx is None
+            or symbol_idx >= len(fields)
+        ):
+            continue
+
+        function = _clean_perf_symbol(fields[symbol_idx])
+        if function is None:
+            continue
+        cpu = fields[cpu_idx]
+        command = fields[command_idx]
+        if not cpu or not command:
+            continue
+        try:
+            cpu = str(int(cpu))
+        except ValueError:
+            continue
+
+        begin_ms = _perf_bucket_begin_ms(boot_time_s, perf_time)
+        bucket_key = (current_metric_type, begin_ms, function, cpu, command)
+        periods[bucket_key] = periods.get(bucket_key, 0) + period
+
+    samples: list[dict[str, object]] = []
+    for (metric_type, begin_ms, function, cpu, command), value in sorted(periods.items()):
+        topology = (cpu_topology or {}).get(int(cpu), {})
+        samples.append(
+            {
+                "metric_type": metric_type,
+                "function": function,
+                "cpu": cpu,
+                "cmd": command,
+                "package": str(topology["package_id"]) if "package_id" in topology else None,
+                "die": str(topology["die_id"]) if "die_id" in topology else None,
+                "core": str(topology["core_id"]) if "core_id" in topology else None,
+                "thread": str(topology["thread_id"]) if "thread_id" in topology else None,
+                **{
+                    breakout: topology.get(breakout)
+                    for breakout in CACHE_DOMAIN_BREAKOUTS
+                    if breakout in topology
+                },
+                "begin": begin_ms,
+                "end": begin_ms + PERF_TIME_QUANTUM_MS - 1,
+                "value": value,
+            }
+        )
+    return samples
+
+
+def _emit_perf_samples(samples: list[dict[str, object]], metrics) -> None:
+    metric_idx_cache: dict[tuple[str, str, str, str], int] = {}
+
+    for sample in samples:
+        metric_type = str(sample["metric_type"])
+        function = str(sample["function"])
+        cpu = str(sample["cpu"])
+        command = str(sample["cmd"])
+        cache_key = (metric_type, function, cpu, command)
+        names = {"function": function, "cpu": cpu, "cmd": command}
+        for breakout in ("package", "die", "core", "thread", *CACHE_DOMAIN_BREAKOUTS):
+            if sample.get(breakout) is not None:
+                names[breakout] = str(sample[breakout])
+        metric_sample = {
+            "begin": sample["begin"],
+            "end": sample["end"],
+            "value": sample["value"],
+        }
+
+        if cache_key in metric_idx_cache:
+            metrics.log_sample_by_idx(
+                metric_idx_cache[cache_key],
+                metric_sample["value"],
+                metric_sample["end"],
+                metric_sample["begin"],
+            )
+        else:
+            desc = {
+                "source": PERF_SOURCE,
+                "class": "count",
+                "type": metric_type,
+                "default-aggregation": "sum",
+            }
+            metric_idx_cache[cache_key] = metrics.log_sample(
+                PERF_SOURCE, desc, names, metric_sample
+            )
+
+
 def process_turbostat(log_file: str) -> None:
     print(f"Post-processing turbostat: {log_file}")
+    from toolbox.cdm_metrics import CDMMetrics
+    from toolbox.fileio import open_read_text_file
+
     metrics = CDMMetrics()
     metric_idx_cache: dict[tuple, int] = {}
 
@@ -86,8 +310,8 @@ def process_turbostat(log_file: str) -> None:
                     if cache_key in metric_idx_cache:
                         metrics.log_sample_by_idx(metric_idx_cache[cache_key], val, ts_ms)
                     else:
-                        desc = {"source": SOURCE, "class": cdm_class, "type": metric_type, "default-aggregation": default_agg}
-                        idx = metrics.log_sample(SOURCE, desc, {}, {**sample_base, "value": val})
+                        desc = {"source": TURBOSTAT_SOURCE, "class": cdm_class, "type": metric_type, "default-aggregation": default_agg}
+                        idx = metrics.log_sample(TURBOSTAT_SOURCE, desc, {}, {**sample_base, "value": val})
                         metric_idx_cache[cache_key] = idx
 
         elif cpu_field not in ("-", ""):
@@ -112,13 +336,55 @@ def process_turbostat(log_file: str) -> None:
                     if cache_key in metric_idx_cache:
                         metrics.log_sample_by_idx(metric_idx_cache[cache_key], val, ts_ms)
                     else:
-                        desc = {"source": SOURCE, "class": cdm_class, "type": metric_type, "default-aggregation": default_agg}
-                        idx = metrics.log_sample(SOURCE, desc, names, {**sample_base, "value": val})
+                        desc = {"source": TURBOSTAT_SOURCE, "class": cdm_class, "type": metric_type, "default-aggregation": default_agg}
+                        idx = metrics.log_sample(TURBOSTAT_SOURCE, desc, names, {**sample_base, "value": val})
                         metric_idx_cache[cache_key] = idx
 
     fh.close()
     metrics.finish_samples()
     print("Post-processing for turbostat complete")
+
+
+def process_perf_report(report_file: str, boot_time_file: str) -> None:
+    print(f"Post-processing perf-record: {report_file}")
+    from toolbox.cdm_metrics import CDMMetrics
+    from toolbox.fileio import open_read_text_file
+
+    try:
+        boot_time_s = int(Path(boot_time_file).read_text().strip())
+    except (FileNotFoundError, ValueError):
+        print(f"ERROR: could not read a valid boot time from {boot_time_file}")
+        return
+
+    try:
+        fh, _ = open_read_text_file(report_file)
+    except FileNotFoundError:
+        print(f"ERROR: could not open {report_file}")
+        return
+
+    try:
+        try:
+            with open(PERF_CPU_TOPOLOGY_FILE) as topology_fh:
+                cpu_topology = _parse_cpu_topology(topology_fh)
+        except FileNotFoundError:
+            print("WARNING: could not find CPU topology file; omitting topology breakouts")
+            cpu_topology = {}
+        skipped_events: set[str] = set()
+        samples = _parse_perf_report(fh, boot_time_s, cpu_topology, skipped_events)
+    finally:
+        fh.close()
+
+    for event_name in sorted(skipped_events):
+        print(f"WARNING: ignoring unsupported perf event '{event_name}'")
+
+    if not samples:
+        print("WARNING: no perf-report samples found")
+        return
+
+    metrics = CDMMetrics()
+    _emit_perf_samples(samples, metrics)
+    metrics.finish_samples()
+    print(f"Post-processing for perf-record complete ({len(samples)} function buckets)")
 
 
 def main() -> None:
@@ -138,6 +404,18 @@ def main() -> None:
         print("WARNING: no turbostat-stdout.txt file found — skipping")
     else:
         process_turbostat(turbostat_files[0])
+
+    perf_report_files = [
+        f for f in files
+        if re.match(rf"^{re.escape(PERF_REPORT_BASENAME)}(\.xz)?$", f)
+    ]
+
+    if len(perf_report_files) > 1:
+        print(f"ERROR: multiple perf report files found: {perf_report_files}")
+    elif not perf_report_files:
+        print("WARNING: no perf-report.csv file found — skipping")
+    else:
+        process_perf_report(perf_report_files[0], PERF_BOOT_TIME_FILE)
 
     print("kerneltools post-processing complete")
 

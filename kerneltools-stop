@@ -120,6 +120,17 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
         perf)
             echo "Running perf archive"
             time /usr/bin/perf archive perf.data
+            echo "Generating structured perf report for CDM post-processing"
+            if ! /usr/bin/perf report --stdio --no-children \
+                --sort=time,overhead,cpu,comm,symbol \
+                --time-quantum=1s \
+                --field-separator=, \
+                --fields=overhead,period,sample,time,cpu,comm,symbol \
+                -i perf.data >perf-report.csv; then
+                echo "ERROR: could not generate perf-report.csv"
+                exit 1
+            fi
+            ${taskset_cmd} xz --threads=0 perf-report.csv
             if [ "$perf_gen_local_report" == "1" ]; then
                 perf report 2>&1 >perf-report.txt
             fi

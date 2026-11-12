@@ -21,6 +21,7 @@ echo
 subtools="turbostat" # subtools that will be used, any combination of: turbostat,perf,speed-select-util,trace-cmd,sysfs-trace <no-spaces>
 interval=10
 record_opts=""
+default_perf_events="cycles,instructions,branch-instructions,branch-misses,cache-misses"
 base_freq=""
 core_power=""
 turbo_freq=""
@@ -87,9 +88,90 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
         perf)
             echo "Starting perf record"
             mkdir -p ~/.debug
-            cmd="/usr/bin/perf record -a $record_opts"
-            time=$(date -u --date="$(TZ=UTC uptime -s)" +%s)
-            echo "uptime as seconds since epoch: $time"
+            : >kerneltools-cpu-topology.txt
+            for cpu_path in /sys/devices/system/cpu/cpu[0-9]*; do
+                [ -d "$cpu_path" ] || continue
+                cpu=${cpu_path##*/}
+                cpu=${cpu#cpu}
+                online=$(cat "$cpu_path/online" 2>/dev/null)
+                [ "$online" = "1" ] || [ -z "$online" ] || continue
+                package=$(cat "$cpu_path/topology/physical_package_id" 2>/dev/null)
+                die=$(cat "$cpu_path/topology/die_id" 2>/dev/null)
+                core=$(cat "$cpu_path/topology/core_id" 2>/dev/null)
+                siblings=$(cat "$cpu_path/topology/thread_siblings_list" 2>/dev/null)
+                shared_l1_domain=""
+                shared_l2_domain=""
+                shared_l3_domain=""
+                shared_l4_domain=""
+                for cache_path in "$cpu_path/cache"/index*; do
+                    [ -d "$cache_path" ] || continue
+                    cache_level=$(cat "$cache_path/level" 2>/dev/null)
+                    shared_cpus=$(cat "$cache_path/shared_cpu_list" 2>/dev/null)
+                    [ -n "$shared_cpus" ] || continue
+                    case "$cache_level" in
+                        1) shared_l1_domain=$shared_cpus ;;
+                        2) shared_l2_domain=$shared_cpus ;;
+                        3) shared_l3_domain=$shared_cpus ;;
+                        4) shared_l4_domain=$shared_cpus ;;
+                    esac
+                done
+                : "${package:=0}"
+                : "${die:=0}"
+                : "${core:=$cpu}"
+                thread=0
+                for sibling_group in ${siblings//,/ }; do
+                    case "$sibling_group" in
+                        *-*)
+                            sibling_start=${sibling_group%-*}
+                            sibling_end=${sibling_group#*-}
+                            if [ "$cpu" -ge "$sibling_start" ] && [ "$cpu" -le "$sibling_end" ]; then
+                                thread=$((cpu - sibling_start))
+                                break
+                            fi
+                            thread=$((thread + sibling_end - sibling_start + 1))
+                            ;;
+                        *)
+                            if [ "$sibling_group" = "$cpu" ]; then
+                                break
+                            fi
+                            thread=$((thread + 1))
+                            ;;
+                    esac
+                done
+                printf 'cpu=%s package=%s die=%s core=%s thread=%s' \
+                    "$cpu" "$package" "$die" "$core" "$thread" \
+                    >>kerneltools-cpu-topology.txt
+                if [ -n "$shared_l1_domain" ]; then
+                    printf ' shared-l1-domain=%s' "$shared_l1_domain" >>kerneltools-cpu-topology.txt
+                fi
+                if [ -n "$shared_l2_domain" ]; then
+                    printf ' shared-l2-domain=%s' "$shared_l2_domain" >>kerneltools-cpu-topology.txt
+                fi
+                if [ -n "$shared_l3_domain" ]; then
+                    printf ' shared-l3-domain=%s' "$shared_l3_domain" >>kerneltools-cpu-topology.txt
+                fi
+                if [ -n "$shared_l4_domain" ]; then
+                    printf ' shared-l4-domain=%s' "$shared_l4_domain" >>kerneltools-cpu-topology.txt
+                fi
+                printf '\n' >>kerneltools-cpu-topology.txt
+            done
+            perf_events_requested=0
+            for record_opt in $record_opts; do
+                case "$record_opt" in
+                    -e|--event|--event=*|-e?*)
+                        perf_events_requested=1
+                        break
+                        ;;
+                esac
+            done
+            perf_record_opts=$record_opts
+            if [ "$perf_events_requested" -eq 0 ]; then
+                perf_record_opts="-e $default_perf_events $record_opts"
+            fi
+            cmd="/usr/bin/perf record -a $perf_record_opts"
+            boot_time=$(date -u --date="$(TZ=UTC uptime -s)" +%s)
+            printf '%s\n' "$boot_time" >kerneltools-boot-time.txt
+            echo "uptime as seconds since epoch: $boot_time"
             echo "Going to run $cmd"
             $cmd &
             perf_pid=$!
