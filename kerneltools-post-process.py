@@ -32,6 +32,7 @@ PERF_BOOT_TIME_FILE = "kerneltools-boot-time.txt"
 PERF_CPU_TOPOLOGY_FILE = "kerneltools-cpu-topology.txt"
 PERF_BUCKET_FILE = "kerneltools-perf-bucket.txt"
 PERF_BUCKET_MS_DEFAULT = 3000
+PERF_BUCKET_MS_LEGACY_DEFAULT = 1000
 
 
 def _safe_float(fields: list[str], col_idx: dict[str, int], name: str) -> float | None:
@@ -82,9 +83,9 @@ def _read_perf_bucket_ms(bucket_file: str) -> int:
     except FileNotFoundError:
         print(
             f"NOTE: {bucket_file} not found; "
-            f"using default {PERF_BUCKET_MS_DEFAULT} ms perf buckets"
+            f"using historical default {PERF_BUCKET_MS_LEGACY_DEFAULT} ms perf buckets"
         )
-        return PERF_BUCKET_MS_DEFAULT
+        return PERF_BUCKET_MS_LEGACY_DEFAULT
     except ValueError:
         print(
             f"WARNING: could not read a valid perf bucket width from {bucket_file}; "

@@ -424,6 +424,22 @@ def test_parse_perf_report_uses_configured_bucket_width():
     ]
 
 
+def test_parse_perf_report_uses_non_multiple_bucket_width():
+    lines = [
+        *CYCLES_EVENT_HEADER,
+        "# Overhead,Period,Samples,Time,CPU,Command,Symbol",
+        " 10.00%,100,1,1.5000,0,cmd,[.] do_work",
+        " 20.00%,200,1,3.0000,0,cmd,[.] do_work",
+    ]
+
+    samples = MODULE._parse_perf_report(lines, 0, CPU_TOPOLOGY, bucket_ms=1500)
+
+    assert [(sample["begin"], sample["end"], sample["value"]) for sample in samples] == [
+        (1500, 2999, 100),
+        (3000, 4499, 200),
+    ]
+
+
 def test_perf_bucket_boundaries_do_not_round_across_a_bucket():
     assert MODULE._perf_bucket_begin_ms(1000, 2.9999, 3000) == 1000000
     assert MODULE._perf_bucket_begin_ms(1000, 3.0000, 3000) == 1003000
@@ -439,7 +455,7 @@ def test_read_perf_bucket_ms_reads_sidecar_value(tmp_path):
 def test_read_perf_bucket_ms_falls_back_when_sidecar_is_absent(tmp_path):
     bucket_file = tmp_path / "kerneltools-perf-bucket.txt"
 
-    assert MODULE._read_perf_bucket_ms(str(bucket_file)) == 3000
+    assert MODULE._read_perf_bucket_ms(str(bucket_file)) == 1000
 
 
 def test_read_perf_bucket_ms_falls_back_on_invalid_sidecar_value(tmp_path):
@@ -454,6 +470,16 @@ def test_read_perf_bucket_ms_falls_back_on_non_positive_sidecar_value(tmp_path):
     bucket_file.write_text("0\n")
 
     assert MODULE._read_perf_bucket_ms(str(bucket_file)) == 3000
+
+
+def test_kerneltools_stop_uses_configured_perf_time_quantum():
+    stop_path = Path(__file__).parents[1] / "kerneltools-stop"
+    source = stop_path.read_text()
+
+    assert "perf_bucket_ms=3000" in source
+    assert "--perf-bucket-ms)" in source
+    assert 'perf_bucket_ms=$1' in source
+    assert '--time-quantum="${perf_bucket_ms}ms"' in source
 
 
 def test_emit_perf_samples_uses_expected_metric_descriptor_and_breakout():
