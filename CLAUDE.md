@@ -42,8 +42,9 @@ Wrapper scripts for Linux kernel profiling tools (perf, turbostat, intel-speed-s
   persists boot time, captures sysfs CPU topology, and records the configured
   CDM bucket width at start (in `kerneltools-boot-time.txt`,
   `kerneltools-cpu-topology.txt`, and `kerneltools-perf-bucket.txt`
-  respectively), generates a perf report with a one-second time quantum at
-  stop, and the controller sums raw periods separately for each supported
+  respectively), generates a perf report with a time quantum
+  matching the configured CDM bucket width at stop, and the
+  controller sums raw periods separately for each supported
   event into `perf-bucket-ms`-wide buckets.
   Unsupported events are skipped. Missing function/CPU/cmd buckets are omitted
   rather than zero-filled.
