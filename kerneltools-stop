@@ -19,7 +19,7 @@ perf_gen_local_report=0
 sysfs_trace_cleanup_cmds=()
 sysfs_trace_collection="per-cpu"
 
-longopts="subtools:,record-opts:,interval:,base-freq:,turbo-freq:,core-power:,perf-gen-local-report,sysfs-trace-setup:,sysfs-trace-cleanup:,sysfs-trace-collection:"
+longopts="subtools:,record-opts:,interval:,perf-bucket-ms:,base-freq:,turbo-freq:,core-power:,perf-gen-local-report,sysfs-trace-setup:,sysfs-trace-cleanup:,sysfs-trace-collection:"
 opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
 eval set -- "$opts";
 while true; do
@@ -58,6 +58,9 @@ while true; do
             shift;
             ;;
         --interval)
+            shift;
+            ;;
+        --perf-bucket-ms)
             shift;
             ;;
         --perf-gen-local-report)

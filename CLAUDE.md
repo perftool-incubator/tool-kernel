@@ -21,7 +21,8 @@ Wrapper scripts for Linux kernel profiling tools (perf, turbostat, intel-speed-s
 
 ## Configuration
 - `--subtools <list>` — Comma-separated subtools (default: `turbostat`)
-- `--interval <seconds>` — Collection interval (default: `10`)
+- `--interval <seconds>` — Turbostat collection interval (default: `10`); does not affect perf bucketing
+- `--perf-bucket-ms <ms>` — Width of the perf-record CDM time buckets (default: `3000`)
 - `--record-opts`, `--trace-cmd-record-opts` — Extra options for perf/trace-cmd
 - `--base-freq`, `--turbo-freq`, `--core-power` — Turbostat frequency/power settings
 - `--sysfs-trace-setup`, `--sysfs-trace-cleanup` — Setup/cleanup commands for sysfs-trace
@@ -38,8 +39,11 @@ Wrapper scripts for Linux kernel profiling tools (perf, turbostat, intel-speed-s
   `cycles,instructions,branch-instructions,branch-misses,cache-misses`.
   Breakouts include `function`, `cpu`, `cmd`,
   `package`, `die`, `core`, `thread`, and shared-cache domains. The collector
-  persists boot time and captures sysfs CPU topology at start in
-  `kerneltools-cpu-topology.txt`, generates a one-second perf report at stop,
-  and the controller sums raw periods separately for each supported event.
+  persists boot time, captures sysfs CPU topology, and records the configured
+  CDM bucket width at start (in `kerneltools-boot-time.txt`,
+  `kerneltools-cpu-topology.txt`, and `kerneltools-perf-bucket.txt`
+  respectively), generates a perf report with a one-second time quantum at
+  stop, and the controller sums raw periods separately for each supported
+  event into `perf-bucket-ms`-wide buckets.
   Unsupported events are skipped. Missing function/CPU/cmd buckets are omitted
   rather than zero-filled.

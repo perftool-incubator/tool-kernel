@@ -52,6 +52,7 @@
         "perf.data.tar.bz2",
         "kerneltools-boot-time.txt",
         "kerneltools-cpu-topology.txt",
+        "kerneltools-perf-bucket.txt",
         "perf-report.csv.xz"
       ]
     },

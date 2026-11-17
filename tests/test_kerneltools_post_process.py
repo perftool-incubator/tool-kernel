@@ -33,7 +33,7 @@ def test_parse_perf_report_aggregates_by_function_cpu_and_command():
         " 95.00%,475,1,3.0000,0,cmd,[.] other_work,-      -",
     ]
 
-    samples = MODULE._parse_perf_report(lines, 1700000000, CPU_TOPOLOGY)
+    samples = MODULE._parse_perf_report(lines, 1700000000, CPU_TOPOLOGY, bucket_ms=1000)
 
     assert samples == [
         {
@@ -151,7 +151,7 @@ def test_parse_perf_report_preserves_function_cpu_command_gaps():
         " 20.00%,200,1,3.0000,0,cmd,[.] one",
     ]
 
-    samples = MODULE._parse_perf_report(lines, 0, CPU_TOPOLOGY)
+    samples = MODULE._parse_perf_report(lines, 0, CPU_TOPOLOGY, bucket_ms=1000)
 
     assert [(sample["begin"], sample["end"], sample["value"]) for sample in samples] == [
         (1000, 1999, 100),
@@ -230,7 +230,7 @@ def test_parse_perf_report_uses_raw_period_for_precision():
         " 0.00%,999999,1,1.0000,0,cmd,[.] common_function",
     ]
 
-    samples = MODULE._parse_perf_report(lines, 0, CPU_TOPOLOGY)
+    samples = MODULE._parse_perf_report(lines, 0, CPU_TOPOLOGY, bucket_ms=1000)
 
     assert samples == [
         {
@@ -315,7 +315,7 @@ def test_parse_perf_report_includes_cache_domain_breakouts():
         }
     }
 
-    samples = MODULE._parse_perf_report(lines, 0, topology)
+    samples = MODULE._parse_perf_report(lines, 0, topology, bucket_ms=1000)
 
     assert samples == [
         {
@@ -386,9 +386,74 @@ def test_parse_cpu_topology_ignores_malformed_lines():
     }
 
 
-def test_perf_bucket_boundaries_do_not_round_across_a_second():
-    assert MODULE._perf_bucket_begin_ms(1000, 0.9999) == 1000000
-    assert MODULE._perf_bucket_begin_ms(1000, 1.0000) == 1001000
+def test_parse_perf_report_uses_three_second_buckets_by_default():
+    lines = [
+        *CYCLES_EVENT_HEADER,
+        "# Overhead,Period,Samples,Time,CPU,Command,Symbol",
+        " 10.00%,100,1,1.0000,0,cmd,[.] do_work",
+        " 20.00%,200,1,2.0000,0,cmd,[.] do_work",
+        " 30.00%,50,1,3.0000,0,cmd,[.] do_work",
+        " 40.00%,60,1,4.0000,0,cmd,[.] do_work",
+    ]
+
+    samples = MODULE._parse_perf_report(lines, 0, CPU_TOPOLOGY)
+
+    assert [(sample["begin"], sample["end"], sample["value"]) for sample in samples] == [
+        (0, 2999, 300),
+        (3000, 5999, 110),
+    ]
+
+
+def test_parse_perf_report_uses_configured_bucket_width():
+    lines = [
+        *CYCLES_EVENT_HEADER,
+        "# Overhead,Period,Samples,Time,CPU,Command,Symbol",
+        " 10.00%,100,1,1.0000,0,cmd,[.] do_work",
+        " 20.00%,200,1,2.0000,0,cmd,[.] do_work",
+        " 30.00%,300,1,3.0000,0,cmd,[.] do_work",
+        " 40.00%,400,1,4.0000,0,cmd,[.] do_work",
+        " 50.00%,500,1,5.0000,0,cmd,[.] do_work",
+        " 60.00%,600,1,6.0000,0,cmd,[.] do_work",
+    ]
+
+    samples = MODULE._parse_perf_report(lines, 0, CPU_TOPOLOGY, bucket_ms=5000)
+
+    assert [(sample["begin"], sample["end"], sample["value"]) for sample in samples] == [
+        (0, 4999, 1000),
+        (5000, 9999, 1100),
+    ]
+
+
+def test_perf_bucket_boundaries_do_not_round_across_a_bucket():
+    assert MODULE._perf_bucket_begin_ms(1000, 2.9999, 3000) == 1000000
+    assert MODULE._perf_bucket_begin_ms(1000, 3.0000, 3000) == 1003000
+
+
+def test_read_perf_bucket_ms_reads_sidecar_value(tmp_path):
+    bucket_file = tmp_path / "kerneltools-perf-bucket.txt"
+    bucket_file.write_text("5000\n")
+
+    assert MODULE._read_perf_bucket_ms(str(bucket_file)) == 5000
+
+
+def test_read_perf_bucket_ms_falls_back_when_sidecar_is_absent(tmp_path):
+    bucket_file = tmp_path / "kerneltools-perf-bucket.txt"
+
+    assert MODULE._read_perf_bucket_ms(str(bucket_file)) == 3000
+
+
+def test_read_perf_bucket_ms_falls_back_on_invalid_sidecar_value(tmp_path):
+    bucket_file = tmp_path / "kerneltools-perf-bucket.txt"
+    bucket_file.write_text("not-a-number\n")
+
+    assert MODULE._read_perf_bucket_ms(str(bucket_file)) == 3000
+
+
+def test_read_perf_bucket_ms_falls_back_on_non_positive_sidecar_value(tmp_path):
+    bucket_file = tmp_path / "kerneltools-perf-bucket.txt"
+    bucket_file.write_text("0\n")
+
+    assert MODULE._read_perf_bucket_ms(str(bucket_file)) == 3000
 
 
 def test_emit_perf_samples_uses_expected_metric_descriptor_and_breakout():
