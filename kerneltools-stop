@@ -17,10 +17,11 @@ subtools="turbostat"
 record_opts=""
 perf_gen_local_report=0
 perf_bucket_ms=3000
+turbostat_interval=10
 sysfs_trace_cleanup_cmds=()
 sysfs_trace_collection="per-cpu"
 
-longopts="subtools:,record-opts:,interval:,perf-bucket-ms:,base-freq:,turbo-freq:,core-power:,perf-gen-local-report,sysfs-trace-setup:,sysfs-trace-cleanup:,sysfs-trace-collection:"
+longopts="subtools:,record-opts:,turbostat-interval:,interval:,perf-bucket-ms:,base-freq:,turbo-freq:,core-power:,perf-gen-local-report,sysfs-trace-setup:,sysfs-trace-cleanup:,sysfs-trace-collection:"
 opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
 eval set -- "$opts";
 while true; do
@@ -58,8 +59,15 @@ while true; do
         --turbo-freq)
             shift;
             ;;
-        --interval)
+        --turbostat-interval)
+            turbostat_interval=$1
             shift;
+            echo "turbostat_interval=$turbostat_interval"
+            echo "effective turbostat interval: $turbostat_interval seconds"
+            ;;
+        --interval)
+            echo "--interval has been removed; use --turbostat-interval"
+            exit 1
             ;;
         --perf-bucket-ms)
             perf_bucket_ms=$1

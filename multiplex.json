@@ -2,7 +2,7 @@
     "presets": {
         "defaults" : [
             { "arg": "subtools", "vals": ["turbostat"] },
-            { "arg": "interval", "vals": ["10"] },
+            { "arg": "turbostat-interval", "vals": ["10"] },
             { "arg": "perf-bucket-ms", "vals": ["3000"] }
         ]
     },
@@ -14,7 +14,7 @@
         },
         "positive_integer" : {
             "description" : "a whole number greater than 0",
-            "args" : [ "interval", "perf-bucket-ms" ],
+            "args" : [ "turbostat-interval", "perf-bucket-ms" ],
             "vals": "^[1-9][0-9]*$"
         },
         "enable_disable" : {

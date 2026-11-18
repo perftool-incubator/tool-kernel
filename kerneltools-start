@@ -19,7 +19,7 @@ mount
 echo
 # defaults
 subtools="turbostat" # subtools that will be used, any combination of: turbostat,perf,speed-select-util,trace-cmd,sysfs-trace <no-spaces>
-interval=10
+turbostat_interval=10
 perf_bucket_ms=3000
 record_opts=""
 default_perf_events="cycles,instructions,branch-instructions,branch-misses,cache-misses"
@@ -30,7 +30,7 @@ trace_cmd_record_opts=""
 sysfs_trace_setup_cmds=()
 
 echo "Processing arguments"
-longopts="subtools:,record-opts:,interval:,perf-bucket-ms:,base-freq:,turbo-freq:,core-power:,trace-cmd-record-opts:,sysfs-trace-setup:,sysfs-trace-cleanup:"
+longopts="subtools:,record-opts:,turbostat-interval:,interval:,perf-bucket-ms:,base-freq:,turbo-freq:,core-power:,trace-cmd-record-opts:,sysfs-trace-setup:,sysfs-trace-cleanup:"
 opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
 eval set -- "$opts";
 while true; do
@@ -66,9 +66,14 @@ while true; do
             turbo_freq=$val
             echo "setting turbo_freq=$turbo_freq"
             ;;
+        --turbostat-interval)
+            turbostat_interval=$val
+            echo "setting turbostat_interval=$turbostat_interval"
+            echo "effective turbostat interval: $turbostat_interval seconds"
+            ;;
         --interval)
-            interval=$val
-            echo "setting interval=$interval"
+            echo "--interval has been removed; use --turbostat-interval"
+            exit 1
             ;;
         --perf-bucket-ms)
             perf_bucket_ms=$val
@@ -187,7 +192,7 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
             ;;
         turbostat)
             echo "Starting turbostat"
-            nohup /usr/bin/turbostat -d -d -i $interval -o turbostat-stdout.txt  2>turbostat-stderr.txt &
+            nohup /usr/bin/turbostat -d -d -i "$turbostat_interval" -o turbostat-stdout.txt  2>turbostat-stderr.txt &
             turbo_pid=$!
             echo "turbostat pid is $turbo_pid"
             echo "$turbo_pid" >>kerneltools-pids.txt

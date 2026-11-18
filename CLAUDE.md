@@ -10,7 +10,7 @@ Wrapper scripts for Linux kernel profiling tools (perf, turbostat, intel-speed-s
 ## Key Files
 | File | Purpose |
 |------|---------|
-| `kerneltools-start` | Launches configured subtools with parameters for interval, recording options, frequencies |
+| `kerneltools-start` | Launches configured subtools with parameters for turbostat interval, recording options, frequencies |
 | `kerneltools-stop` | Kills collectors, generates perf archives and reports, trace-cmd reports, compresses output with xz |
 | `kerneltools-post-process.py` | CDM post-processor for turbostat and perf-record output |
 | `boot_to_epoch.py` | Converts between boot time and Unix epoch for perf time filtering |
@@ -21,11 +21,12 @@ Wrapper scripts for Linux kernel profiling tools (perf, turbostat, intel-speed-s
 
 ## Configuration
 - `--subtools <list>` — Comma-separated subtools (default: `turbostat`)
-- `--interval <seconds>` — Turbostat collection interval (default: `10`); does not affect perf bucketing
+- `--turbostat-interval <seconds>` — Turbostat collection interval (default: `10`); does not affect perf bucketing
 - `--perf-bucket-ms <ms>` — Width of the perf-record CDM time buckets (default: `3000`)
 - `--record-opts`, `--trace-cmd-record-opts` — Extra options for perf/trace-cmd
 - `--base-freq`, `--turbo-freq`, `--core-power` — Turbostat frequency/power settings
 - `--sysfs-trace-setup`, `--sysfs-trace-cleanup` — Setup/cleanup commands for sysfs-trace
+- `interval` is no longer accepted; migrate it to `turbostat-interval`, which affects only turbostat and not perf bucketing
 
 ## Conventions
 - Primary branch is `master`
