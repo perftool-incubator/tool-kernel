@@ -19,7 +19,7 @@ Kerneltools runs one or more subtools during test execution:
 
 The start script accepts these parameters:
 - `--subtools <list>` — Comma-separated subtools to run (default: `turbostat`)
-- `--interval <seconds>` — Turbostat collection interval (default: `10`); does not affect perf bucketing
+- `--turbostat-interval <seconds>` — Turbostat collection interval (default: `10`); does not affect perf bucketing
 - `--perf-bucket-ms <ms>` — Width of the perf-record CDM time buckets (default: `3000`)
 - `--record-opts <opts>` — Additional options passed to perf record
 - `--base-freq <freq>` — Base frequency for turbostat
@@ -32,6 +32,10 @@ The start script accepts these parameters:
 The stop script additionally accepts:
 - `--perf-gen-local-report <ON|OFF>` — Generate an additional human-readable `perf-report.txt` alongside the archived `perf.data` (default: `OFF`). `kerneltools-stop` itself takes this as a no-argument flag; `rickshaw.json`'s `param_regex` rewrites `ON` to the bare flag and drops `OFF` (and its value) entirely before the script ever sees it -- mirroring the same ON/OFF-fixup convention used by bench-trafficgen for its own no-argument flags.
 - `--sysfs-trace-collection <system|per-cpu>` — Trace buffer collection mode (default: `per-cpu`)
+
+### Breaking change
+
+The former `interval` parameter has been removed. Migrate run-file settings from `interval` to `turbostat-interval`; old configurations using `interval` fail with a migration error. `turbostat-interval` affects only turbostat and not perf bucketing.
 
 ### Perf CDM metrics
 
