@@ -19,7 +19,8 @@ Kerneltools runs one or more subtools during test execution:
 
 The start script accepts these parameters:
 - `--subtools <list>` — Comma-separated subtools to run (default: `turbostat`)
-- `--interval <seconds>` — Collection interval (default: `10`)
+- `--interval <seconds>` — Turbostat collection interval (default: `10`); does not affect perf bucketing
+- `--perf-bucket-ms <ms>` — Width of the perf-record CDM time buckets (default: `3000`)
 - `--record-opts <opts>` — Additional options passed to perf record
 - `--base-freq <freq>` — Base frequency for turbostat
 - `--turbo-freq <freq>` — Turbo frequency for turbostat
@@ -36,9 +37,12 @@ The stop script additionally accepts:
 
 When the `perf` subtool is enabled, `kerneltools-start` records the collector's
 boot time in `kerneltools-boot-time.txt` and captures the collector's CPU
-topology in `kerneltools-cpu-topology.txt`. At stop time, after `perf archive`
-and before compressing `perf.data`, `kerneltools-stop` generates
-`perf-report.csv.xz` with one-second time buckets.
+topology in `kerneltools-cpu-topology.txt`, and persists the configured CDM
+bucket width in `kerneltools-perf-bucket.txt`. At stop time, after `perf
+archive` and before compressing `perf.data`, `kerneltools-stop` generates
+`perf-report.csv.xz` with a perf time quantum matching the configured CDM
+bucket width; the controller post-processor aggregates those rows into CDM
+buckets `perf-bucket-ms` milliseconds wide.
 
 Unless `--record-opts` already contains `-e` or `--event`, `perf record`
 collects this default event set:
@@ -56,6 +60,17 @@ events and reduces their effective sampling rates.
 The controller post-processor converts each symbol's sampled event period in
 each bucket into a CDM sample. The event section in the perf report controls the
 metric type:
+
+Bucket boundaries stay aligned to the boot-relative timeline: a sample at perf
+time `t` lands in the bucket beginning at `floor(t / perf-bucket-ms) *
+perf-bucket-ms` (in milliseconds since boot), so consecutive samples with the
+same width produce comparable, non-overlapping buckets. Samples shorter than
+the bucket width collapse into a single bucket unless they straddle a bucket
+boundary. The structured perf report uses the same configured width as its
+time quantum.
+When post-processing archived tool data with no `kerneltools-perf-bucket.txt`
+present, the post-processor uses the historical `1000` ms default. A malformed
+or non-positive sidecar value falls back to the current `3000` ms default.
 
 - `cycles` or `cpu-cycles` (including modifiers such as `cycles:u`) produces
   type `cpu-cycles`.

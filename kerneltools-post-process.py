@@ -30,7 +30,9 @@ PERF_EVENT_SECTION_RE = re.compile(r"\bof event '([^']+)'")
 PERF_REPORT_BASENAME = "perf-report.csv"
 PERF_BOOT_TIME_FILE = "kerneltools-boot-time.txt"
 PERF_CPU_TOPOLOGY_FILE = "kerneltools-cpu-topology.txt"
-PERF_TIME_QUANTUM_MS = 1000
+PERF_BUCKET_FILE = "kerneltools-perf-bucket.txt"
+PERF_BUCKET_MS_DEFAULT = 3000
+PERF_BUCKET_MS_LEGACY_DEFAULT = 1000
 
 
 def _safe_float(fields: list[str], col_idx: dict[str, int], name: str) -> float | None:
@@ -69,10 +71,36 @@ def _safe_int(fields: list[str], col_idx: dict[str, int], name: str) -> int | No
         return None
 
 
-def _perf_bucket_begin_ms(boot_time_s: int, perf_time_s: float) -> int:
+def _perf_bucket_begin_ms(boot_time_s: int, perf_time_s: float, bucket_ms: int) -> int:
     perf_time_ms = int(perf_time_s * 1000)
-    bucket_offset_ms = (perf_time_ms // PERF_TIME_QUANTUM_MS) * PERF_TIME_QUANTUM_MS
+    bucket_offset_ms = (perf_time_ms // bucket_ms) * bucket_ms
     return boot_time_s * 1000 + bucket_offset_ms
+
+
+def _read_perf_bucket_ms(bucket_file: str) -> int:
+    try:
+        bucket_ms = int(Path(bucket_file).read_text().strip())
+    except FileNotFoundError:
+        print(
+            f"NOTE: {bucket_file} not found; "
+            f"using historical default {PERF_BUCKET_MS_LEGACY_DEFAULT} ms perf buckets"
+        )
+        return PERF_BUCKET_MS_LEGACY_DEFAULT
+    except ValueError:
+        print(
+            f"WARNING: could not read a valid perf bucket width from {bucket_file}; "
+            f"using {PERF_BUCKET_MS_DEFAULT} ms"
+        )
+        return PERF_BUCKET_MS_DEFAULT
+
+    if bucket_ms <= 0:
+        print(
+            f"WARNING: non-positive perf bucket width {bucket_ms} in {bucket_file}; "
+            f"using {PERF_BUCKET_MS_DEFAULT} ms"
+        )
+        return PERF_BUCKET_MS_DEFAULT
+
+    return bucket_ms
 
 
 def _perf_event_base_name(event_name: str) -> str:
@@ -124,6 +152,7 @@ def _parse_perf_report(
     boot_time_s: int,
     cpu_topology: dict[int, dict[str, object]] | None = None,
     skipped_events: set[str] | None = None,
+    bucket_ms: int = PERF_BUCKET_MS_DEFAULT,
 ) -> list[dict[str, object]]:
     col_idx: dict[str, int] = {}
     periods: dict[tuple[str, int, str, str, str], int] = {}
@@ -182,7 +211,7 @@ def _parse_perf_report(
         except ValueError:
             continue
 
-        begin_ms = _perf_bucket_begin_ms(boot_time_s, perf_time)
+        begin_ms = _perf_bucket_begin_ms(boot_time_s, perf_time, bucket_ms)
         bucket_key = (current_metric_type, begin_ms, function, cpu, command)
         periods[bucket_key] = periods.get(bucket_key, 0) + period
 
@@ -205,7 +234,7 @@ def _parse_perf_report(
                     if breakout in topology
                 },
                 "begin": begin_ms,
-                "end": begin_ms + PERF_TIME_QUANTUM_MS - 1,
+                "end": begin_ms + bucket_ms - 1,
                 "value": value,
             }
         )
@@ -345,7 +374,7 @@ def process_turbostat(log_file: str) -> None:
     print("Post-processing for turbostat complete")
 
 
-def process_perf_report(report_file: str, boot_time_file: str) -> None:
+def process_perf_report(report_file: str, boot_time_file: str, bucket_file: str) -> None:
     print(f"Post-processing perf-record: {report_file}")
     from toolbox.cdm_metrics import CDMMetrics
     from toolbox.fileio import open_read_text_file
@@ -355,6 +384,9 @@ def process_perf_report(report_file: str, boot_time_file: str) -> None:
     except (FileNotFoundError, ValueError):
         print(f"ERROR: could not read a valid boot time from {boot_time_file}")
         return
+
+    bucket_ms = _read_perf_bucket_ms(bucket_file)
+    print(f"perf-record bucket width: {bucket_ms} ms")
 
     try:
         fh, _ = open_read_text_file(report_file)
@@ -370,7 +402,7 @@ def process_perf_report(report_file: str, boot_time_file: str) -> None:
             print("WARNING: could not find CPU topology file; omitting topology breakouts")
             cpu_topology = {}
         skipped_events: set[str] = set()
-        samples = _parse_perf_report(fh, boot_time_s, cpu_topology, skipped_events)
+        samples = _parse_perf_report(fh, boot_time_s, cpu_topology, skipped_events, bucket_ms)
     finally:
         fh.close()
 
@@ -415,7 +447,7 @@ def main() -> None:
     elif not perf_report_files:
         print("WARNING: no perf-report.csv file found — skipping")
     else:
-        process_perf_report(perf_report_files[0], PERF_BOOT_TIME_FILE)
+        process_perf_report(perf_report_files[0], PERF_BOOT_TIME_FILE, PERF_BUCKET_FILE)
 
     print("kerneltools post-processing complete")
 

@@ -20,6 +20,7 @@ echo
 # defaults
 subtools="turbostat" # subtools that will be used, any combination of: turbostat,perf,speed-select-util,trace-cmd,sysfs-trace <no-spaces>
 interval=10
+perf_bucket_ms=3000
 record_opts=""
 default_perf_events="cycles,instructions,branch-instructions,branch-misses,cache-misses"
 base_freq=""
@@ -29,7 +30,7 @@ trace_cmd_record_opts=""
 sysfs_trace_setup_cmds=()
 
 echo "Processing arguments"
-longopts="subtools:,record-opts:,interval:,base-freq:,turbo-freq:,core-power:,trace-cmd-record-opts:,sysfs-trace-setup:,sysfs-trace-cleanup:"
+longopts="subtools:,record-opts:,interval:,perf-bucket-ms:,base-freq:,turbo-freq:,core-power:,trace-cmd-record-opts:,sysfs-trace-setup:,sysfs-trace-cleanup:"
 opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
 eval set -- "$opts";
 while true; do
@@ -68,6 +69,10 @@ while true; do
         --interval)
             interval=$val
             echo "setting interval=$interval"
+            ;;
+        --perf-bucket-ms)
+            perf_bucket_ms=$val
+            echo "setting perf_bucket_ms=$perf_bucket_ms"
             ;;
         --trace-cmd-record-opts)
             trace_cmd_record_opts=$val
@@ -172,6 +177,8 @@ for subtool in `echo $subtools | sed -e 's/,/ /g'`; do
             boot_time=$(date -u --date="$(TZ=UTC uptime -s)" +%s)
             printf '%s\n' "$boot_time" >kerneltools-boot-time.txt
             echo "uptime as seconds since epoch: $boot_time"
+            printf '%s\n' "$perf_bucket_ms" >kerneltools-perf-bucket.txt
+            echo "perf CDM bucket width: $perf_bucket_ms ms"
             echo "Going to run $cmd"
             $cmd &
             perf_pid=$!
